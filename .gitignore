@@ -4,3 +4,4 @@ __pycache__/
 .env
 *.pyc
 .env.example
+README2.md
