@@ -1,0 +1,12 @@
+{
+  "version": "4.2.0",
+  "total_cases": 500,
+  "passed": 468,
+  "failed": 22,
+  "blocked": 10,
+  "defects": [
+    {"id": "BUG-001", "priority": "P0", "module": "案件管理", "status": "open"},
+    {"id": "BUG-002", "priority": "P1", "module": "权限管理", "status": "open"},
+    {"id": "BUG-003", "priority": "P1", "module": "接口", "status": "resolved"}
+  ]
+}

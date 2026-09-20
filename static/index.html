@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI 测试报告助手</title>
+  <style>
+    body{font-family:Arial,"Microsoft YaHei",sans-serif;max-width:1000px;margin:40px auto;padding:0 20px;line-height:1.6}
+    textarea{width:100%;min-height:260px;padding:12px;box-sizing:border-box}
+    input{width:100%;padding:10px;box-sizing:border-box;margin:8px 0 16px}
+    button{padding:10px 20px;cursor:pointer}
+    pre{white-space:pre-wrap;background:#f6f6f6;padding:18px;border-radius:8px}
+    .muted{color:#666}
+  </style>
+</head>
+<body>
+  <h1>AI 测试报告助手</h1>
+  <p class="muted">输入测试执行数据，调用兼容 OpenAI Chat Completions 接口的大模型生成测试总结、风险分析和改进建议。</p>
+
+  <label>测试数据（支持 JSON 或普通文本）</label>
+  <textarea id="data">{
+  "version": "4.2.0",
+  "total_cases": 500,
+  "passed": 468,
+  "failed": 22,
+  "blocked": 10,
+  "defects": [
+    {"id":"BUG-001","priority":"P0","module":"案件管理","status":"open"},
+    {"id":"BUG-002","priority":"P1","module":"权限管理","status":"open"},
+    {"id":"BUG-003","priority":"P1","module":"接口","status":"resolved"}
+  ]
+}</textarea>
+
+  <label>额外要求</label>
+  <input id="instruction" value="重点分析高优先级缺陷、版本风险，并给出下一轮回归测试建议。">
+
+  <button onclick="analyze()">生成 AI 测试报告</button>
+  <h2>结果</h2>
+  <pre id="result">等待分析...</pre>
+
+<script>
+async function analyze(){
+  const result = document.getElementById("result");
+  result.textContent = "正在调用大模型...";
+  try{
+    const res = await fetch("/api/analyze", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        test_data:document.getElementById("data").value,
+        instruction:document.getElementById("instruction").value
+      })
+    });
+    const body = await res.json();
+    if(!res.ok) throw new Error(body.detail || "请求失败");
+    result.textContent = body.report + "\n\n[model] " + body.model;
+  }catch(e){
+    result.textContent = "错误：" + e.message;
+  }
+}
+</script>
+</body>
+</html>
