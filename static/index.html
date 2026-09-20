@@ -1,63 +1,21 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>AI 测试报告助手</title>
-  <style>
-    body{font-family:Arial,"Microsoft YaHei",sans-serif;max-width:1000px;margin:40px auto;padding:0 20px;line-height:1.6}
-    textarea{width:100%;min-height:260px;padding:12px;box-sizing:border-box}
-    input{width:100%;padding:10px;box-sizing:border-box;margin:8px 0 16px}
-    button{padding:10px 20px;cursor:pointer}
-    pre{white-space:pre-wrap;background:#f6f6f6;padding:18px;border-radius:8px}
-    .muted{color:#666}
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 测试报告助手</title>
+<style>
+*{box-sizing:border-box}body{font-family:"Microsoft YaHei",Arial;background:#f4f7fb;margin:0;color:#1f2937}.container{max-width:1200px;margin:32px auto;padding:24px}.card{background:#fff;border-radius:18px;padding:24px;margin-bottom:20px;box-shadow:0 8px 30px #0001}h1{margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.stat{padding:20px;border-radius:14px;background:#eef4ff}.stat b{font-size:28px}.toolbar button{margin-right:10px;padding:12px 18px;border:0;border-radius:10px;cursor:pointer;background:#2563eb;color:white}textarea,input{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px}textarea{min-height:240px}pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:20px;border-radius:14px;min-height:240px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style>
 </head>
-<body>
-  <h1>AI 测试报告助手</h1>
-  <p class="muted">输入测试执行数据，调用兼容 OpenAI Chat Completions 接口的大模型生成测试总结、风险分析和改进建议。</p>
-
-  <label>测试数据（支持 JSON 或普通文本）</label>
-  <textarea id="data">{
-  "version": "4.2.0",
-  "total_cases": 500,
-  "passed": 468,
-  "failed": 22,
-  "blocked": 10,
-  "defects": [
-    {"id":"BUG-001","priority":"P0","module":"案件管理","status":"open"},
-    {"id":"BUG-002","priority":"P1","module":"权限管理","status":"open"},
-    {"id":"BUG-003","priority":"P1","module":"接口","status":"resolved"}
-  ]
-}</textarea>
-
-  <label>额外要求</label>
-  <input id="instruction" value="重点分析高优先级缺陷、版本风险，并给出下一轮回归测试建议。">
-
-  <button onclick="analyze()">生成 AI 测试报告</button>
-  <h2>结果</h2>
-  <pre id="result">等待分析...</pre>
-
+<body><div class="container">
+<div class="card"><h1>🚀 AI 测试报告助手</h1><p>智能生成测试总结、风险分析和改进建议</p></div>
+<div class="card"><label>测试数据</label><textarea id="data">{"total_cases":500,"passed":468,"failed":22,"blocked":10}</textarea><br><br><label>分析要求</label><input id="instruction" value="重点分析高优先级缺陷、版本风险，并给出回归建议。"><br><br><button onclick="analyze()">生成报告</button></div>
+<div class="card grid"><div class="stat">测试用例<br><b id="total">-</b></div><div class="stat">通过率<br><b id="rate">-</b></div><div class="stat">报告状态<br><b>AI</b></div></div>
+<div class="card toolbar"><button onclick="download('md')">导出 Markdown</button><button onclick="download('html')">导出 PDF(打印)</button><button onclick="download('doc')">导出 Word</button></div>
+<div class="card"><h2>测试报告</h2><pre id="result">等待分析...</pre></div>
+</div>
 <script>
-async function analyze(){
-  const result = document.getElementById("result");
-  result.textContent = "正在调用大模型...";
-  try{
-    const res = await fetch("/api/analyze", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        test_data:document.getElementById("data").value,
-        instruction:document.getElementById("instruction").value
-      })
-    });
-    const body = await res.json();
-    if(!res.ok) throw new Error(body.detail || "请求失败");
-    result.textContent = body.report + "\n\n[model] " + body.model;
-  }catch(e){
-    result.textContent = "错误：" + e.message;
-  }
-}
-</script>
-</body>
-</html>
+let report='';
+async function analyze(){let r=document.getElementById('result');r.textContent='分析中...';try{let res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_data:data.value,instruction:instruction.value})});let b=await res.json();report=b.report;result.textContent=report+'\n\n[model] '+b.model;let d=JSON.parse(data.value);total.textContent=d.total_cases||'-';rate.textContent=d.total_cases?((d.passed/d.total_cases)*100).toFixed(1)+'%':'-'}catch(e){r.textContent=e.message}}
+function download(type){let blob;if(type==='md')blob=new Blob([report||result.textContent],{type:'text/markdown'});else blob=new Blob(['AI测试报告\n\n'+(report||result.textContent)],{type:'text/plain'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI_Test_Report.'+(type==='md'?'md':type==='doc'?'doc':'txt');a.click()}
+</script></body></html>
