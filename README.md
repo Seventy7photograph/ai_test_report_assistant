@@ -51,8 +51,3 @@ uvicorn app:app --reload
   "instruction": "重点分析高优先级缺陷和下一轮回归建议"
 }
 ```
-
-
-## 5. 注意
-
-API Key 只放在 `.env`，不要提交到 GitHub。
