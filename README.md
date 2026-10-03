@@ -51,7 +51,4 @@ uvicorn app:app --reload
   "instruction": "重点分析高优先级缺陷和下一轮回归建议"
 }
 ```
-<<<<<<< HEAD
 
-=======
->>>>>>> b698709e025231e84f4a71a251271c2afe5d41da
