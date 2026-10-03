@@ -1,0 +1,16 @@
+from fastapi.testclient import TestClient
+from app import app
+
+client = TestClient(app)
+
+
+def test_health():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_index():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "AI 测试报告助手" in response.text

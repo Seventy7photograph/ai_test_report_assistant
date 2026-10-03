@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 测试报告助手</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:"Microsoft YaHei",Arial;background:#f4f7fb;margin:0;color:#1f2937}
+.container{max-width:1200px;margin:32px auto;padding:24px}
+.card{background:#fff;border-radius:18px;padding:24px;margin-bottom:20px;box-shadow:0 8px 30px #0001}h1{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.stat{padding:20px;border-radius:14px;background:#eef4ff}
+.stat b{font-size:28px}
+.toolbar button{margin-right:10px;padding:12px 18px;border:0;border-radius:10px;cursor:pointer;background:#2563eb;color:white}
+textarea,input{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px}
+textarea{min-height:240px}
+pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:20px;border-radius:14px;min-height:240px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+
+
+@media print {
+  /* 隐藏不需要打印的区域：输入框、按钮、统计卡片 */
+  .no-print {
+    display: none !important;
+  }
+  /* 去除页面背景色和阴影，节省墨水并适应A4纸 */
+  body {
+    background: #fff;
+  }
+  .card {
+    box-shadow: none;
+    border: 1px solid #eee;
+  }
+  /* 让报告区域在打印时黑底白字变为白底黑字 */
+  #result {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #ddd;
+  }
+}
+</style>
+</head>
+<body><div class="container">
+<div class="card"><h1>AI 测试报告助手</h1><p>智能生成测试总结、风险分析和改进建议</p></div>
+
+<!-- 给不需要打印的区域加上 no-print 类 -->
+<div class="card no-print"><label>测试数据</label>
+    <textarea id="data">{
+  "version": "4.2.0",
+  "total_cases": 500,
+  "passed": 468,
+  "failed": 22,
+  "blocked": 10,
+  "defects": [
+    {"id":"BUG-001","priority":"P0","module":"案件管理","status":"open"},
+    {"id":"BUG-002","priority":"P1","module":"权限管理","status":"open"},
+    {"id":"BUG-003","priority":"P1","module":"接口","status":"resolved"}
+  ]
+}</textarea>
+  <br><br>
+  <label>分析要求</label>
+  <input id="instruction" value="重点分析高优先级缺陷、版本风险，并给出回归建议。"><br><br>
+  <button onclick="analyze()">生成报告</button></div>
+
+<div class="grid">
+  <div class="stat">测试用例<br><b id="total">-</b></div>
+  <div class="stat">通过率<br><b id="rate">-</b></div>
+  <div class="stat">报告状态<br><b>AI</b></div></div>
+
+<div class="card toolbar no-print">
+  <button onclick="download('md')">导出 Markdown</button>
+  <button onclick="download('pdf')">导出 PDF</button>
+  <button onclick="download('doc')">导出 Word</button>
+</div>
+
+<div class="card">
+  <h2>测试报告</h2>
+  <pre id="result">等待分析...</pre>
+</div>
+</div>
+<script>
+let report='';
+async function analyze(){let r=document.getElementById('result');
+r.textContent='分析中...';
+try{let res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_data:data.value,instruction:instruction.value})});
+let b=await res.json();
+report=b.report;
+result.textContent=report+'\n\n[model] '+b.model;let d=JSON.parse(data.value);
+total.textContent=d.total_cases||'-';
+rate.textContent=d.total_cases?((d.passed/d.total_cases)*100).toFixed(1)+'%':'-'}catch(e){r.textContent=e.message}}
+
+function download(type){
+  // 如果是导出PDF，直接调用浏览器打印功能
+  if(type === 'pdf'){
+    window.print();
+    return;
+  }
+
+  let blob;
+  if(type==='md'){
+    blob=new Blob([report||result.textContent],{type:'text/markdown;charset=utf-8'});
+  } else if(type==='doc') {
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>
+      <head><meta charset='utf-8'><title>Export</title></head>
+      <body><pre style="white-space:pre-wrap;font-family:'Microsoft YaHei';">${report||result.textContent}</pre></body></html>`;
+    blob=new Blob(['\ufeff', htmlContent],{type:'application/msword'});
+  } else {
+    blob=new Blob(['AI测试报告\n\n'+(report||result.textContent)],{type:'text/plain;charset=utf-8'});
+  }
+
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  let ext = type === 'md' ? 'md' : type === 'doc' ? 'doc' : 'txt';
+  a.download='AI_Test_Report.' + ext;
+  a.click();
+
+  // 释放内存
+  URL.revokeObjectURL(a.href);
+}
+</script></body></html>
