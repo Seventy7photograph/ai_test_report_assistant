@@ -73,6 +73,8 @@ export function defectStatusLabel(status: string | null): string {
       return '已修复'
     case 'rejected':
       return '已驳回'
+    case 'unknown':
+      return '状态未标注'
     default:
       return status || '—'
   }
@@ -84,11 +86,24 @@ export function defectStatusColor(status: string | null): string {
       return 'var(--fail)'
     case 'resolved':
       return 'var(--pass)'
+    // 未标注按未关闭计入判定，颜色要跟上，别让人误以为已关闭。
+    case 'unknown':
+      return 'var(--blocked)'
     case 'rejected':
       return 'var(--ink-3)'
     default:
       return 'var(--ink-3)'
   }
+}
+
+/** 归一化丢掉了原文（待复核 → unknown），有原文时补在标签后面。 */
+export function defectStatusDetail(status: string | null, raw: string | null): string {
+  const label = defectStatusLabel(status)
+  const text = (raw ?? '').trim()
+  if (!text) return label
+  const normalized = text.toLowerCase()
+  if (normalized === (status ?? '').toLowerCase() || normalized === label.toLowerCase()) return label
+  return `${label}（原文：${text}）`
 }
 
 export function priorityColor(priority: string | null): string {

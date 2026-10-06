@@ -10,7 +10,7 @@ import asyncio
 import ipaddress
 import json
 import time
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Callable
 from urllib.parse import urlparse
 
 import httpx
@@ -33,8 +33,13 @@ def _headers(settings: LLMSettings) -> dict[str, str]:
     }
 
 
-def _payload(settings: LLMSettings, user_prompt: str, stream: bool = False) -> dict[str, Any]:
-    return {
+def _payload(
+    settings: LLMSettings,
+    user_prompt: str,
+    stream: bool = False,
+    include_usage: bool = False,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "model": settings.model,
         "temperature": settings.temperature,
         "stream": stream,
@@ -43,6 +48,11 @@ def _payload(settings: LLMSettings, user_prompt: str, stream: bool = False) -> d
             {"role": "user", "content": user_prompt},
         ],
     }
+    if stream and include_usage:
+        # 流式默认不返回 usage，要显式要一次。有服务商不认这个字段，
+        # stream() 里对 400 做了去掉它重试的降级。
+        payload["stream_options"] = {"include_usage": True}
+    return payload
 
 
 def _require_key(settings: LLMSettings) -> None:
@@ -170,13 +180,24 @@ async def complete(user_prompt: str, settings: LLMSettings) -> tuple[str, dict[s
     return _extract_content(data), data.get("usage")
 
 
-async def stream(user_prompt: str, settings: LLMSettings) -> AsyncIterator[str]:
-    """流式生成。逐段产出 delta 文本。"""
+async def stream(
+    user_prompt: str,
+    settings: LLMSettings,
+    usage_sink: Callable[[dict[str, Any]], None] | None = None,
+) -> AsyncIterator[str]:
+    """流式生成。逐段产出 delta 文本；usage 通过 usage_sink 回传。
+
+    流式响应默认不带 usage，要显式请求 `stream_options.include_usage`。
+    部分兼容服务不认这个字段并回 400 —— 那时去掉它重来一次，而不是把整个生成判失败。
+    """
 
     _require_key(settings)
     attempts = settings.max_retries + 1
+    include_usage = usage_sink is not None
+    attempt = 0
 
-    for attempt in range(attempts):
+    # 用 while 而不是 for：协议降级（去掉 stream_options）不该消耗重试预算。
+    while attempt < attempts:
         emitted = False
         try:
             async with _client(settings) as client:
@@ -184,11 +205,17 @@ async def stream(user_prompt: str, settings: LLMSettings) -> AsyncIterator[str]:
                     "POST",
                     _endpoint(settings),
                     headers=_headers(settings),
-                    json=_payload(settings, user_prompt, stream=True),
+                    json=_payload(settings, user_prompt, stream=True, include_usage=include_usage),
                 ) as response:
+                    if response.status_code == 400 and include_usage:
+                        # 服务商不认 stream_options。不占用重试预算，去掉字段重来。
+                        await response.aread()
+                        include_usage = False
+                        continue
                     if response.status_code in _RETRY_STATUS and attempt < attempts - 1:
                         await response.aread()
                         await asyncio.sleep(0.6 * (2**attempt))
+                        attempt += 1
                         continue
                     try:
                         response.raise_for_status()
@@ -206,6 +233,10 @@ async def stream(user_prompt: str, settings: LLMSettings) -> AsyncIterator[str]:
                             payload = json.loads(chunk)
                         except json.JSONDecodeError:
                             continue
+                        if usage_sink is not None:
+                            usage = payload.get("usage")
+                            if isinstance(usage, dict):
+                                usage_sink(usage)
                         try:
                             delta = payload["choices"][0]["delta"].get("content")
                         except (KeyError, IndexError, TypeError, AttributeError):
@@ -222,6 +253,7 @@ async def stream(user_prompt: str, settings: LLMSettings) -> AsyncIterator[str]:
                 raise HTTPException(status_code=502, detail=f"模型服务连接失败：{exc}") from exc
 
         await asyncio.sleep(0.6 * (2**attempt))
+        attempt += 1
 
 
 async def probe(settings: LLMSettings) -> tuple[int, str]:

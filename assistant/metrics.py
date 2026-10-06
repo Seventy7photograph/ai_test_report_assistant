@@ -10,6 +10,7 @@ import json
 import re
 from typing import Any, Iterator
 
+from .config import VerdictThresholds
 from .schemas import CountItem, Defect, Metrics, MetricsResult
 
 # --------------------------------------------------------------- 字段别名
@@ -288,12 +289,15 @@ def find_defects(parsed: Any) -> list[dict[str, Any]]:
 
 
 def _to_defect(raw: dict[str, Any]) -> Defect:
+    raw_status = _as_text(_lookup(raw, _DEFECT_STATUS_KEYS))
     return Defect(
         id=_as_text(_lookup(raw, _DEFECT_ID_KEYS)),
         title=_as_text(_lookup(raw, _DEFECT_TITLE_KEYS)),
         priority=normalize_priority(_lookup(raw, _DEFECT_PRIORITY_KEYS)),
         module=_as_text(_lookup(raw, _DEFECT_MODULE_KEYS)),
-        status=normalize_status(_lookup(raw, _DEFECT_STATUS_KEYS)),
+        status=normalize_status(raw_status),
+        # 归一化会丢信息（待复核 → unknown），原文留着给界面显示。
+        status_raw=raw_status,
     )
 
 
@@ -305,12 +309,14 @@ def _decide_verdict(
     fail_rate: float,
     blocked: int,
     skipped: int,
+    execution_rate: float,
     defects_open: int,
     open_p0: int,
     open_p1: int,
     defects_known: bool,
+    thresholds: VerdictThresholds,
 ) -> tuple[str, str, list[str]]:
-    """规则判定。判定的每一条依据都要写出来，可被复核。"""
+    """规则判定。每一条依据都写出来，并且带上本次使用的阈值，可被复核。"""
 
     reasons: list[str] = []
 
@@ -325,30 +331,44 @@ def _decide_verdict(
 
     if open_p1 > 0:
         reasons.append(f"存在 {open_p1} 条未关闭的 P1 缺陷")
-    if fail_rate > 0.05:
-        reasons.append(f"失败率 {fail_rate * 100:.1f}% 高于 5% 阈值")
+    if fail_rate > thresholds.fail_rate:
+        reasons.append(
+            f"失败率 {fail_rate * 100:.1f}% 高于 {thresholds.fail_rate * 100:.1f}% 阈值"
+        )
     if blocked:
         blocked_rate = blocked / total
-        if blocked_rate > 0.05:
-            reasons.append(f"阻塞率 {blocked_rate * 100:.1f}% 高于 5% 阈值")
+        if blocked_rate > thresholds.blocked_rate:
+            reasons.append(
+                f"阻塞率 {blocked_rate * 100:.1f}% 高于 {thresholds.blocked_rate * 100:.1f}% 阈值"
+            )
+    # 结论只覆盖执行到的范围。执行率不达标时不能给"建议发版"。
+    if execution_rate < thresholds.execution_floor:
+        reasons.append(
+            f"执行率 {execution_rate * 100:.1f}% 低于 {thresholds.execution_floor * 100:.1f}% 下限，"
+            "结论未覆盖未执行部分"
+        )
     if reasons:
         return "conditional", "有条件通过", reasons
 
-    reasons.append(f"通过率 {pass_rate * 100:.1f}%，失败率 {fail_rate * 100:.1f}%")
+    reasons.append(
+        f"通过率 {pass_rate * 100:.1f}%（失败率 {fail_rate * 100:.1f}%，"
+        f"均未超过 {thresholds.fail_rate * 100:.1f}% 阈值）"
+    )
     if defects_known and defects_open == 0:
         reasons.append("无未关闭缺陷")
     elif defects_open:
         reasons.append(f"仍有 {defects_open} 条未关闭缺陷，但均低于 P1")
-    if skipped:
-        reasons.append(f"另有 {skipped} 条用例未执行，结论未覆盖该部分")
+    if skipped or blocked:
+        reasons.append(f"另有 {skipped} 条未执行、{blocked} 条阻塞，执行率 {execution_rate * 100:.1f}%")
     return "pass", "建议发版", reasons
 
 
 # --------------------------------------------------------------- 主入口
 
-def compute_metrics(raw: str) -> MetricsResult:
+def compute_metrics(raw: str, thresholds: VerdictThresholds | None = None) -> MetricsResult:
     """把原始输入变成一组可核对的指标。算不出来就诚实地说算不出来。"""
 
+    thresholds = thresholds or VerdictThresholds()
     parsed, warnings = parse_payload(raw)
     if parsed is None:
         return MetricsResult(metrics=None, source_format="text", warnings=warnings)
@@ -434,7 +454,10 @@ def compute_metrics(raw: str) -> MetricsResult:
 
     pass_rate = passed / total if total else 0.0
     fail_rate = failed / total if total else 0.0
-    execution_rate = (total - blocked - skipped) / total if total else 0.0
+    executed = max(total - blocked - skipped, 0)
+    execution_rate = executed / total if total else 0.0
+    # 通过率的分母口径有两种读法，两个都算出来，别让读者自己猜。
+    effective_pass_rate = (passed / executed) if executed else 0.0
 
     by_priority: dict[str, int] = {}
     by_status: dict[str, int] = {}
@@ -480,10 +503,12 @@ def compute_metrics(raw: str) -> MetricsResult:
         fail_rate=fail_rate,
         blocked=blocked,
         skipped=skipped,
+        execution_rate=execution_rate,
         defects_open=defects_open,
         open_p0=open_p0,
         open_p1=open_p1,
         defects_known=bool(defects),
+        thresholds=thresholds,
     )
 
     result.metrics = Metrics(
@@ -492,9 +517,11 @@ def compute_metrics(raw: str) -> MetricsResult:
         failed=failed,
         blocked=blocked,
         skipped=skipped,
+        executed=executed,
         pass_rate=pass_rate,
         fail_rate=fail_rate,
         execution_rate=execution_rate,
+        effective_pass_rate=effective_pass_rate,
         defects_total=len(defects),
         defects_open=defects_open,
         open_p0=open_p0,

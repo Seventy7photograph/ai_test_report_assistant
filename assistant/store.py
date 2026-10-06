@@ -262,6 +262,7 @@ SETTINGS_KEYS = (
     "temperature",
     "timeout",
     "max_retries",
+    "thresholds",
 )
 
 
@@ -294,7 +295,7 @@ def save_settings(values: dict[str, Any]) -> dict[str, Any]:
         for key, value in values.items():
             if key not in SETTINGS_KEYS:
                 continue
-            if value is None or value == "" or value == []:
+            if value is None or value == "" or value == [] or value == {}:
                 conn.execute("DELETE FROM settings WHERE key = ?", (key,))
             else:
                 conn.execute(

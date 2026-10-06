@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Defect } from '@/api/types'
-import { defectStatusColor, defectStatusLabel, priorityColor } from '@/utils/format'
+import { defectStatusColor, defectStatusDetail, priorityColor } from '@/utils/format'
 
 const props = defineProps<{ defects: Defect[] }>()
 
@@ -48,7 +48,7 @@ const sorted = computed(() => {
               :style="{ background: defectStatusColor(defect.status) }"
               aria-hidden="true"
             />
-            {{ defectStatusLabel(defect.status) }}
+            {{ defectStatusDetail(defect.status, defect.status_raw) }}
           </span>
         </td>
       </tr>

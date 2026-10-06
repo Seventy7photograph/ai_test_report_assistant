@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from .. import store
-from ..config import llm_settings
+from ..config import llm_settings, verdict_thresholds
 from ..llm import complete, stream as llm_stream
 from ..metrics import compute_metrics
 from ..prompts import build_user_prompt
@@ -26,7 +26,7 @@ _MAX_PROMPT_DATA = 20000
 def _prepare(req: AnalyzeRequest) -> tuple[MetricsResult, str]:
     """先算指标，再把原始数据整理成便于模型阅读的形式。"""
 
-    result = compute_metrics(req.test_data)
+    result = compute_metrics(req.test_data, verdict_thresholds())
     normalized = req.test_data
     try:
         normalized = json.dumps(json.loads(req.test_data), ensure_ascii=False, indent=2)
@@ -54,7 +54,7 @@ def _default_title(req: AnalyzeRequest, result: MetricsResult) -> str:
 async def metrics(req: MetricsRequest) -> MetricsResult:
     """纯计算，不调用模型。用于界面上实时读数。"""
 
-    return compute_metrics(req.test_data)
+    return compute_metrics(req.test_data, verdict_thresholds())
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -135,8 +135,10 @@ async def analyze_stream(req: AnalyzeRequest) -> StreamingResponse:
 
         started = time.perf_counter()
         chunks: list[str] = []
+        usage: dict[str, Any] = {}
         try:
-            async for delta in llm_stream(user_prompt, settings):
+            # stream 拿到 usage 分片时回调这里，归档才记得到 token 用量。
+            async for delta in llm_stream(user_prompt, settings, usage.update):
                 chunks.append(delta)
                 yield _sse("delta", {"text": delta})
         except HTTPException as exc:
@@ -165,7 +167,7 @@ async def analyze_stream(req: AnalyzeRequest) -> StreamingResponse:
                         "report": report,
                         "metrics": result.metrics.model_dump() if result.metrics else None,
                         "defects": [d.model_dump() for d in result.defects],
-                        "usage": None,
+                        "usage": usage or None,
                         "warnings": warnings,
                         "elapsed_ms": elapsed_ms,
                     }

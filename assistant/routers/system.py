@@ -11,6 +11,7 @@ from ..config import (
     db_path,
     llm_settings,
     spa_dir,
+    verdict_thresholds,
 )
 from ..llm import probe
 from ..samples import SAMPLES
@@ -39,6 +40,7 @@ async def status() -> StatusResponse:
         temperature=settings.temperature,
         timeout=settings.timeout,
         max_retries=settings.max_retries,
+        thresholds=verdict_thresholds().as_dict(),
         storage_backend="SQLite",
         storage_path=str(db_path()),
         report_count=count,

@@ -272,7 +272,7 @@ def test_analyze_can_skip_archiving(monkeypatch):
 
 
 def test_stream_emits_ordered_events(monkeypatch):
-    async def fake_stream(prompt: str, settings):
+    async def fake_stream(prompt: str, settings, usage_sink=None):
         for piece in ("## 测试概况\n", "本轮共执行 10 条用例。"):
             yield piece
 
@@ -562,6 +562,55 @@ def test_html_export_neutralises_injected_scripts_and_urls():
     assert "&lt;script&gt;" in out
 
 
+def test_html_export_sanitizes_by_whitelist():
+    """白名单消毒：只留安全标签与属性，危险 scheme 与协议相对地址一律丢掉。"""
+    from html.parser import HTMLParser
+
+    from assistant.exporters import to_html
+
+    record = {
+        "title": "t",
+        "model": "m",
+        "report": (
+            "[外面](//evil.example/x)\n\n"
+            "[脚本](javascript:alert(1))\n\n"
+            "[内网](/reports/1)\n\n"
+            "[正常](https://ok.example)\n\n"
+            "![图](data:text/html,x)\n\n"
+            "**粗体**\n\n"
+            "| A | B |\n| - | - |\n| 1 | 2 |\n\n"
+            "```py\nprint(1)\n```\n"
+        ),
+    }
+    out = to_html(record)
+    body = out[out.index("<body"):out.index("</body>")]
+
+    attributes: list[tuple[str, str, str | None]] = []
+
+    class Collector(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            attributes.extend((tag, name, value) for name, value in attrs)
+
+        def handle_startendtag(self, tag, attrs):
+            self.handle_starttag(tag, attrs)
+
+    Collector().feed(body)
+
+    values = " ".join(str(value) for _tag, _name, value in attributes).lower()
+    assert "javascript" not in values
+    assert "vbscript" not in values
+    assert "data:" not in values
+    assert "evil.example" not in values
+    assert any(value == "https://ok.example" for _t, _n, value in attributes)
+    assert any(value == "/reports/1" for _t, _n, value in attributes)
+    assert not [item for item in attributes if item[1].lower().startswith("on")]
+
+    # Markdown 的排版能力不能被消毒误伤
+    assert "<strong>" in body
+    assert "<table>" in body and "<td>2</td>" in body
+    assert "<pre>" in body
+
+
 def test_unrecognised_status_never_opens_the_gate():
     """读不出来的状态曾经既不算未关闭也不算已修复，被闸门当成已关闭放行。"""
     for label in ("in review", "fixing", "待复核", "待验证", "pending verification", "N/A", "？"):
@@ -652,3 +701,150 @@ def test_provider_label_reads_naturally_for_local_hosts():
     assert provider_label("localhost") == "本地服务"
     assert provider_label("192.168.1.20") == "本地服务"
     assert provider_label("") == "自定义"
+
+
+# ------------------------------------------------------------------ 判定阈值
+
+def test_verdict_thresholds_are_configurable():
+    """阈值可配置：同一份数据在严格标准下不能放行。"""
+    from assistant.config import VerdictThresholds
+
+    data = json.dumps({"total_cases": 1000, "passed": 998, "failed": 2, "blocked": 0})
+    assert compute_metrics(data).metrics.verdict == "pass"
+
+    strict = compute_metrics(data, VerdictThresholds(fail_rate=0.0))
+    assert strict.metrics.verdict == "conditional"
+    assert any("0.0% 阈值" in reason for reason in strict.metrics.verdict_reasons)
+
+
+def test_execution_floor_blocks_pass():
+    """执行率不达标不能给"建议发版"。"""
+    from assistant.config import VerdictThresholds
+
+    data = json.dumps({"total_cases": 100, "passed": 40, "failed": 0, "skipped": 60})
+    result = compute_metrics(data).metrics
+    assert result.verdict == "conditional"
+    assert any("执行率" in reason and "下限" in reason for reason in result.verdict_reasons)
+
+    relaxed = compute_metrics(data, VerdictThresholds(execution_floor=0.0)).metrics
+    assert relaxed.verdict == "pass"
+
+
+def test_metrics_expose_both_pass_rate_denominators():
+    data = json.dumps({"total_cases": 100, "passed": 95, "failed": 3, "blocked": 2})
+    metrics = compute_metrics(data).metrics
+    assert metrics.total == 100
+    assert metrics.executed == 98
+    assert abs(metrics.pass_rate - 0.95) < 1e-9  # 通过 ÷ 用例总数
+    assert abs(metrics.effective_pass_rate - 95 / 98) < 1e-9  # 通过 ÷ 已执行
+
+
+def test_thresholds_round_trip_through_settings(monkeypatch):
+    monkeypatch.setenv("VERDICT_FAIL_RATE", "0.05")
+    client.delete("/api/settings")
+
+    view = client.get("/api/settings").json()
+    assert view["thresholds"]["fail_rate"] == 0.05
+    assert view["sources"]["thresholds"] == "env"
+    assert view["env"]["thresholds"]["execution_floor"] == 0.9
+
+    saved = client.put(
+        "/api/settings", json={"thresholds": {"fail_rate": 0.01, "execution_floor": 0.8}}
+    ).json()
+    assert saved["thresholds"]["fail_rate"] == 0.01
+    assert saved["thresholds"]["execution_floor"] == 0.8
+    assert saved["thresholds"]["pass_line"] == 0.95  # 没填的项回落 .env
+    assert saved["sources"]["thresholds"] == "saved"
+    assert client.get("/api/system/status").json()["thresholds"]["fail_rate"] == 0.01
+
+    # 越界值被夹住，认不出的键被丢弃
+    clamped = client.put(
+        "/api/settings", json={"thresholds": {"fail_rate": 5, "junk": 1}}
+    ).json()
+    assert clamped["thresholds"]["fail_rate"] == 1.0
+    assert "junk" not in clamped["thresholds"]
+
+    reset = client.put("/api/settings", json={"thresholds": {}}).json()
+    assert reset["sources"]["thresholds"] == "env"
+    assert reset["thresholds"]["fail_rate"] == 0.05
+
+
+def test_defect_keeps_raw_status():
+    payload = {
+        "total_cases": 10,
+        "passed": 10,
+        "defects": [{"id": "B1", "priority": "P0", "status": "待复核"}],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.defects[0].status == "open"
+    assert result.defects[0].status_raw == "待复核"
+
+
+# ------------------------------------------------------------------ 流式用量
+
+def test_stream_requests_and_forwards_token_usage(monkeypatch):
+    """流式默认不带 usage，要显式请求并回传，归档才记得到用量。"""
+    import httpx
+
+    from assistant.llm import stream as llm_stream
+
+    body = (
+        'data: {"choices":[{"delta":{"content":"甲"}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"乙"}}],'
+        '"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n'
+        "data: [DONE]\n\n"
+    )
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["payload"] = json.loads(request.content)
+        return httpx.Response(200, content=body.encode(), headers={"content-type": "text/event-stream"})
+
+    monkeypatch.setattr(
+        "assistant.llm._client", lambda settings, timeout=None: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    )
+    settings = LLMSettings(
+        api_key="k", base_url="https://api.example", model="m",
+        temperature=0.2, timeout=10.0, max_retries=0,
+    )
+    usage: dict[str, object] = {}
+
+    async def run() -> list[str]:
+        return [chunk async for chunk in llm_stream("提示", settings, usage.update)]
+
+    assert asyncio.run(run()) == ["甲", "乙"]
+    assert seen["payload"]["stream_options"] == {"include_usage": True}
+    assert usage["total_tokens"] == 15
+
+
+def test_stream_falls_back_when_provider_rejects_stream_options(monkeypatch):
+    """不认 stream_options 的服务商会回 400 —— 去掉字段重来，而不是判定失败。"""
+    import httpx
+
+    from assistant.llm import stream as llm_stream
+
+    body = 'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n'
+    payloads: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        payloads.append(payload)
+        if "stream_options" in payload:
+            return httpx.Response(400, json={"error": {"message": "unknown field stream_options"}})
+        return httpx.Response(200, content=body.encode(), headers={"content-type": "text/event-stream"})
+
+    monkeypatch.setattr(
+        "assistant.llm._client", lambda settings, timeout=None: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    )
+    settings = LLMSettings(
+        api_key="k", base_url="https://api.example", model="m",
+        temperature=0.2, timeout=10.0, max_retries=0,
+    )
+
+    async def run() -> list[str]:
+        return [chunk async for chunk in llm_stream("提示", settings, {}.update)]
+
+    assert asyncio.run(run()) == ["ok"]
+    assert len(payloads) == 2
+    assert "stream_options" in payloads[0]
+    assert "stream_options" not in payloads[1]

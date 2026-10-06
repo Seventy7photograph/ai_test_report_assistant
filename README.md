@@ -8,7 +8,7 @@
 
 - **指标不由模型编**：通过率、执行率、缺陷分布、结论判定都在 `assistant/metrics.py` 里算好，再作为"权威口径"注入 Prompt。模型被明确要求不得重算或改写数字。
 - **读不到就是读不到**：纯文本、格式不完整或无法解析的输入，返回 `metrics: null` 并给出诚实提示，绝不凭空补数。
-- **结论有规则**：未关闭的 P0 直接 `reject`；存在未关闭 P1、或失败率 / 阻塞率超过 5% 判 `conditional`；其余 `pass`。
+- **结论有规则**：未关闭的 P0 直接 `reject`；存在未关闭 P1、失败率 / 阻塞率超过阈值（默认 5%）、或执行率低于下限（默认 90%）判 `conditional`；其余 `pass`。阈值可在设置页调整，判定理由里会写明本次实际使用的数值。
 - **留痕**：每次分析落 SQLite，可列表、可趋势、可两轮对比、可导出。
 
 ## 2. 功能
@@ -17,9 +17,10 @@
 - 确定性指标：用例统计、执行率、通过率、缺陷等级分布、结论判定
 - AI 撰写：测试总结、风险分析、缺陷归纳、下一步建议
 - 流式输出：SSE 逐字返回，报告边生成边读
-- 报告存档：历史列表、趋势曲线（含 95% 门限）、任意两轮对比
+- 报告存档：历史分页列表、趋势曲线（判读线跟随阈值配置）、任意两轮对比
 - 报告导出：界面提供 Markdown / HTML / DOCX，API 另可导出 JSON
 - 模型设置：在界面里改接口地址 / 模型 / Key 并保存，后端 `.env` 始终作为默认值；含服务商探测与真实连通性自测
+- 阈值设置：失败率 / 阻塞率上限、执行率下限、趋势判读线同样可在界面调整并保存，逐项可回退 `.env`
 - 多模型：任何 OpenAI Chat Completions 兼容接口
 
 ## 3. 界面
@@ -97,6 +98,12 @@ cd frontend && npm run dev      # 终端 2，前端 5173，代理 /api 到 8000
 | `LLM_TIMEOUT` | `120` | 单次请求超时（秒） |
 | `LLM_MAX_RETRIES` | `2` | 失败重试次数 |
 | `DATA_DIR` | 项目内 `data/` | 存档目录（SQLite `reports.db`） |
+| `VERDICT_FAIL_RATE` | `0.05` | 失败率上限，超过判「有条件通过」 |
+| `VERDICT_BLOCKED_RATE` | `0.05` | 阻塞率上限，超过判「有条件通过」 |
+| `VERDICT_EXECUTION_FLOOR` | `0.9` | 执行率下限，低于它结论不覆盖全量 |
+| `VERDICT_PASS_LINE` | `0.95` | 趋势图的判读线位置 |
+
+上表是 `.env` 默认值；模型配置与判定阈值都可以在设置页里修改并保存（存在本地 SQLite，不写回 `.env`）。
 
 ## 7. API
 
@@ -109,8 +116,8 @@ cd frontend && npm run dev      # 终端 2，前端 5173，代理 /api 到 8000
 | `POST` | `/api/metrics` | 只算指标，不调模型 |
 | `POST` | `/api/analyze` | 指标 + AI 报告（一次性返回） |
 | `POST` | `/api/analyze/stream` | 同上，SSE 流式 |
-| `GET` | `/api/settings` | 当前生效的模型配置（含每项来源、Key 掩码） |
-| `PUT` | `/api/settings` | 保存界面配置；字段留空即回落 `.env` |
+| `GET` | `/api/settings` | 当前生效的模型与阈值配置（含每项来源、Key 掩码） |
+| `PUT` | `/api/settings` | 保存界面配置（模型 + 判定阈值）；字段留空即回落 `.env` |
 | `DELETE` | `/api/settings` | 清空界面配置，全部回到 `.env` 默认 |
 | `POST` | `/api/settings/test` | 用未保存的表单值探活一次 |
 | `GET` | `/api/reports` | 历史报告列表 |
@@ -152,7 +159,6 @@ POST /api/analyze
 ## 8. 目录结构
 
 ```
-OPTIMIZATION.md            待优化项清单（含已知口径与优先级）
 app.py                     应用入口：路由挂载、MIME 修正、SPA 托管
 assistant/
   config.py                环境变量解析、服务商探测、模型列表
@@ -165,7 +171,7 @@ assistant/
   samples.py               4 套示例数据集
   routers/                 system / analyze / reports / settings 四组接口
 frontend/                  Vue 3 + TS + Vite + Element Plus
-tests/test_app.py          39 项接口、指标与配置测试
+tests/test_app.py          47 项接口、指标、阈值与导出测试
 scripts/mock_llm.py        本地假模型服务（离线跑通全流程）
 scripts/seed_demo.py       演示数据播种（--reset 清空重建）
 scripts/dev.ps1            启动后端并清理残留 uvicorn 进程
@@ -216,8 +222,3 @@ pwsh scripts/dev.ps1        # 自动清理后再启动
 后续的模型错误通过 SSE 的 `event: error` 传给前端。所以「200 + 界面报 502」是正常现象，
 要看前端提示里的具体原因。本机模型服务（`127.0.0.1` / 内网）被系统代理劫持是常见成因，
 `assistant/llm.py` 已对环回与内网地址强制绕过系统代理。
-
-## 12. 优化清单
-
-已知待优化项（判定阈值可配置、执行率门限、通过率口径、归档分页、流式 token 用量等）
-记录在 [`OPTIMIZATION.md`](OPTIMIZATION.md)，按 P0 / P1 / P2 排列，每条附现象、影响、建议与工作量。

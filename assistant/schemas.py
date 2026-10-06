@@ -27,6 +27,7 @@ class Defect(BaseModel):
     priority: str | None = None
     module: str | None = None
     status: str | None = None
+    status_raw: str | None = None
 
 
 class Metrics(BaseModel):
@@ -37,10 +38,12 @@ class Metrics(BaseModel):
     failed: int = 0
     blocked: int = 0
     skipped: int = 0
+    executed: int = 0
 
     pass_rate: float = 0.0
     fail_rate: float = 0.0
     execution_rate: float = 0.0
+    effective_pass_rate: float = 0.0
 
     defects_total: int = 0
     defects_open: int = 0
@@ -153,6 +156,7 @@ class StatusResponse(BaseModel):
     temperature: float
     timeout: float
     max_retries: int
+    thresholds: dict[str, float] = Field(default_factory=dict)
     storage_backend: str
     storage_path: str
     report_count: int
@@ -194,6 +198,7 @@ class LLMSettingsUpdate(BaseModel):
     temperature: float | None = Field(default=None, ge=0, le=2)
     timeout: float | None = Field(default=None, gt=0, le=600)
     max_retries: int | None = Field(default=None, ge=0, le=10)
+    thresholds: dict[str, float] | None = None
     api_key: str | None = None
     clear_api_key: bool = False
 
@@ -216,6 +221,7 @@ class LLMSettingsView(BaseModel):
     temperature: float
     timeout: float
     max_retries: int
+    thresholds: dict[str, float] = Field(default_factory=dict)
     api_key_set: bool
     api_key_masked: str | None = None
     api_key_stored: bool = False

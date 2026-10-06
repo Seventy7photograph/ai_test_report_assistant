@@ -11,7 +11,7 @@ import { useSystem } from '@/stores/system'
 import { datetime, duration, percent, relativeTime, VERDICT_TONE } from '@/utils/format'
 
 const router = useRouter()
-const { load: reloadStatus } = useSystem()
+const { status, load: reloadStatus } = useSystem()
 
 const items = ref<ReportSummary[]>([])
 const trends = ref<TrendPoint[]>([])
@@ -197,7 +197,7 @@ onMounted(() => {
         <h2 class="panel__title">通过率趋势</h2>
         <span class="panel__meta">最近 {{ trends.length }} 份带指标的存档</span>
       </header>
-      <TrendChart :points="trends" />
+      <TrendChart :points="trends" :pass-line="status?.thresholds?.pass_line ?? 0.95" />
     </section>
 
     <section class="panel">

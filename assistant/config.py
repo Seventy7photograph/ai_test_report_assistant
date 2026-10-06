@@ -71,6 +71,29 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_ratio(name: str, default: float) -> float:
+    """比例型阈值：夹在 0–1。写 `5` 或 `-1` 都不能把判定搞乱。"""
+
+    value = _env_float(name, default)
+    return min(max(value, 0.0), 1.0)
+
+
+THRESHOLD_FIELDS = ("fail_rate", "blocked_rate", "execution_floor", "pass_line")
+
+
+@dataclass(frozen=True)
+class VerdictThresholds:
+    """发版判定的阈值。不同业务的发版标准差别很大，所以不写死在规则里。"""
+
+    fail_rate: float = 0.05
+    blocked_rate: float = 0.05
+    execution_floor: float = 0.9
+    pass_line: float = 0.95
+
+    def as_dict(self) -> dict[str, float]:
+        return {key: float(getattr(self, key)) for key in THRESHOLD_FIELDS}
+
+
 def saved_overrides() -> dict[str, Any]:
     """界面保存的覆盖项。
 
@@ -98,7 +121,26 @@ def env_defaults() -> dict[str, Any]:
         "temperature": 0.2,
         "timeout": _env_float("LLM_TIMEOUT", 120.0),
         "max_retries": max(0, _env_int("LLM_MAX_RETRIES", 2)),
+        "thresholds": {
+            "fail_rate": _env_ratio("VERDICT_FAIL_RATE", 0.05),
+            "blocked_rate": _env_ratio("VERDICT_BLOCKED_RATE", 0.05),
+            "execution_floor": _env_ratio("VERDICT_EXECUTION_FLOOR", 0.9),
+            "pass_line": _env_ratio("VERDICT_PASS_LINE", 0.95),
+        },
     }
+
+
+def verdict_thresholds() -> VerdictThresholds:
+    """发版判定阈值：界面保存的优先，逐项回落到 .env。"""
+
+    merged = dict(env_defaults()["thresholds"])
+    saved = saved_overrides().get("thresholds")
+    if isinstance(saved, dict):
+        for key in THRESHOLD_FIELDS:
+            value = saved.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                merged[key] = min(max(float(value), 0.0), 1.0)
+    return VerdictThresholds(**merged)
 
 
 def _pick(saved: dict[str, Any], key: str, fallback: Any) -> Any:

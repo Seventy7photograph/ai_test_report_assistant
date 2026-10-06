@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import html
 import re
+from html.parser import HTMLParser
 from typing import Any
 
 import markdown as markdown_lib
@@ -188,30 +189,115 @@ def _escape_inline_html(markdown_text: str) -> str:
     return re.sub(r"<(?!https?://|mailto:)", "&lt;", escaped)
 
 
-_UNSAFE_URL_SCHEME = re.compile(
-    r"""(?P<head>\b(?:href|src)\s*=\s*(?P<quote>["']))"""
-    r"""(?P<scheme>\s*(?:javascript|vbscript|data)\s*:)""",
-    re.IGNORECASE,
-)
+# 允许出现的标签：Markdown 渲染器（tables / fenced_code / sane_lists / nl2br）
+# 自己只会产出这些。白名单之外的一律丢掉标签、保留文字。
+_ALLOWED_TAGS = {
+    "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li", "blockquote", "pre", "code",
+    "em", "strong", "del", "ins", "sup", "sub",
+    "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+    "a", "img", "dl", "dt", "dd", "span",
+}
+
+# 每个标签允许保留的属性。其余属性（onclick、style…）一律丢。
+_ALLOWED_ATTRS = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "title"},
+    "th": {"colspan", "rowspan", "align"},
+    "td": {"colspan", "rowspan", "align"},
+    "span": set(),
+}
+
+_SAFE_URL_SCHEMES = ("http://", "https://", "mailto:", "tel:")
+_VOID_TAGS = {"br", "hr", "img"}
 
 
-def _neutralize_unsafe_urls(html_text: str) -> str:
-    """干掉渲染结果里的可执行 URL scheme。
+def _is_safe_url(value: str) -> bool:
+    """只放行 http/https/mailto/tel、相对路径、锚点。
 
-    `<` 已经被转义，所以正文里写不出裸标签；但 Markdown 的链接语法会由
-    渲染器自己生成 `<a href="…">`，而 `[x](javascript:alert(1))` 是合法
-    Markdown。导出文件是同源打开，这种链接点一下就能执行脚本。
-    这里把 href/src 的取值改成空串，保留元素本身。
+    `javascript:` 与 `data:` 是导出文件里真正的执行面，
+    协议相对地址（`//host`）也跟着走白名单，不认识的一律拒。
     """
 
-    return _UNSAFE_URL_SCHEME.sub(
-        lambda match: f"{match.group('head')}#", html_text
-    )
+    candidate = value.strip()
+    if not candidate:
+        return False
+    lowered = candidate.lower()
+    if lowered.startswith("#"):
+        return True
+    # `//host` 是协议相对地址，会指向外部站点，不能当成站内路径放行。
+    if lowered.startswith("//"):
+        return False
+    if lowered.startswith("/") or lowered.startswith("./") or lowered.startswith("../"):
+        return True
+    if any(lowered.startswith(scheme) for scheme in _SAFE_URL_SCHEMES):
+        return True
+    # 没有 scheme 的相对地址是安全的；带 scheme 但不在白名单里的拒绝。
+    return ":" not in lowered.split("#")[0].split("/")[0]
+
+
+class _HtmlSanitizer(HTMLParser):
+    """按标签/属性白名单重建 HTML，顺带校验 URL scheme。
+
+    报告正文来自模型，导出文件是同源打开的 —— 不做白名单就等于让人双击
+    一个可执行脚本。用标准库实现，不引入新依赖。
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style", "iframe", "object", "embed"):
+            # 这些标签的"文字内容"也会被执行或加载，直接连内容一起丢。
+            self._skip_depth += 1
+            return
+        if tag not in _ALLOWED_TAGS:
+            return
+
+        allowed = _ALLOWED_ATTRS.get(tag, set())
+        rendered: list[str] = []
+        for name, value in attrs:
+            name = name.lower()
+            if name not in allowed:
+                continue
+            if name in ("href", "src"):
+                if not _is_safe_url(value or ""):
+                    continue
+            rendered.append(f' {name}="{html.escape(value or "", quote=True)}"')
+
+        self._parts.append(f"<{tag}{''.join(rendered)}>")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style", "iframe", "object", "embed"):
+            self._skip_depth = max(self._skip_depth - 1, 0)
+            return
+        if self._skip_depth or tag not in _ALLOWED_TAGS or tag in _VOID_TAGS:
+            return
+        self._parts.append(f"</{tag}>")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth:
+            self._parts.append(html.escape(data, quote=False))
+
+    def result(self) -> str:
+        return "".join(self._parts)
+
+
+def _sanitize_html(html_text: str) -> str:
+    parser = _HtmlSanitizer()
+    parser.feed(html_text)
+    parser.close()
+    return parser.result()
 
 
 def to_html(record: dict[str, Any]) -> str:
     body_md = (record.get("report") or "").strip()
-    body_html = _neutralize_unsafe_urls(
+    body_html = _sanitize_html(
         markdown_lib.markdown(
             _escape_inline_html(body_md),
             extensions=["tables", "fenced_code", "sane_lists", "nl2br"],

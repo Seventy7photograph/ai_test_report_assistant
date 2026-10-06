@@ -12,9 +12,11 @@ export interface Metrics {
   failed: number
   blocked: number
   skipped: number
+  executed: number
   pass_rate: number
   fail_rate: number
   execution_rate: number
+  effective_pass_rate: number
   defects_total: number
   defects_open: number
   open_p0: number
@@ -33,6 +35,14 @@ export interface Defect {
   priority: string | null
   module: string | null
   status: string | null
+  status_raw: string | null
+}
+
+export interface VerdictThresholds {
+  fail_rate: number
+  blocked_rate: number
+  execution_floor: number
+  pass_line: number
 }
 
 export interface MetricsResult {
@@ -120,6 +130,7 @@ export interface SystemStatus {
   temperature: number
   timeout: number
   max_retries: number
+  thresholds: VerdictThresholds
   storage_backend: string
   storage_path: string
   report_count: number
@@ -150,6 +161,7 @@ export interface LLMSettingsView {
   temperature: number
   timeout: number
   max_retries: number
+  thresholds: VerdictThresholds
   api_key_set: boolean
   api_key_masked: string | null
   api_key_stored: boolean
@@ -161,6 +173,7 @@ export interface LLMSettingsView {
     temperature?: number
     timeout?: number
     max_retries?: number
+    thresholds?: VerdictThresholds
     api_key_set?: boolean
   }
 }
@@ -172,6 +185,7 @@ export interface LLMSettingsUpdate {
   temperature?: number | null
   timeout?: number | null
   max_retries?: number | null
+  thresholds?: Partial<VerdictThresholds> | null
   api_key?: string | null
   clear_api_key?: boolean
 }

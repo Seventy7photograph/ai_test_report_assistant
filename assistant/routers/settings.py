@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 
 from .. import store
 from ..config import available_models, env_defaults, llm_settings, saved_overrides
+from ..config import THRESHOLD_FIELDS, verdict_thresholds
 from ..llm import probe
 from ..schemas import (
     LLMSettingsUpdate,
@@ -21,7 +22,16 @@ from ..schemas import (
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
-_FIELDS = ("base_url", "model", "models", "temperature", "timeout", "max_retries", "api_key")
+_FIELDS = (
+    "base_url",
+    "model",
+    "models",
+    "temperature",
+    "timeout",
+    "max_retries",
+    "thresholds",
+    "api_key",
+)
 
 
 def _mask(secret: str) -> str | None:
@@ -42,7 +52,7 @@ def _view() -> LLMSettingsView:
 
     def source(key: str) -> str:
         value = saved.get(key)
-        return "saved" if value not in (None, "", []) else "env"
+        return "saved" if value not in (None, "", [], {}) else "env"
 
     visible_env = {key: value for key, value in defaults.items() if key != "api_key"}
 
@@ -53,6 +63,7 @@ def _view() -> LLMSettingsView:
         temperature=settings.temperature,
         timeout=settings.timeout,
         max_retries=settings.max_retries,
+        thresholds=verdict_thresholds().as_dict(),
         api_key_set=settings.configured,
         api_key_masked=_mask(stored_key),
         api_key_stored=bool(stored_key),
@@ -87,8 +98,24 @@ async def update_settings(payload: LLMSettingsUpdate) -> LLMSettingsView:
     elif payload.api_key and payload.api_key.strip():
         values["api_key"] = payload.api_key.strip()
 
+    if payload.thresholds is not None:
+        cleaned = _clean_thresholds(payload.thresholds)
+        # 一个都没填 → 当成"留空"，删掉覆盖项回到 .env。
+        values["thresholds"] = cleaned or ""
+
     store.save_settings(values)
     return _view()
+
+
+def _clean_thresholds(raw: dict[str, float]) -> dict[str, float]:
+    """只认已知字段，并夹到 0–1；认不出的键直接丢掉。"""
+
+    cleaned: dict[str, float] = {}
+    for key in THRESHOLD_FIELDS:
+        value = raw.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            cleaned[key] = min(max(float(value), 0.0), 1.0)
+    return cleaned
 
 
 @router.delete("/settings", response_model=LLMSettingsView)

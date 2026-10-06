@@ -3,9 +3,20 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { TrendPoint, Verdict } from '@/api/types'
 import { datetime, percent, VERDICT_FILL } from '@/utils/format'
 
-const props = defineProps<{ points: TrendPoint[] }>()
+const props = defineProps<{ points: TrendPoint[]; passLine?: number }>()
 
-const THRESHOLD = 0.95
+/**
+ * 判读线来自后端的 thresholds.pass_line（界面可配），不在前端写死。
+ * 缺省或脏值时回落到 0.95，至少保证图能画出来。
+ */
+const passLine = computed(() => {
+  const value = props.passLine
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0.95
+  return Math.min(Math.max(value, 0), 1)
+})
+const passLineLabel = computed(
+  () => `${(passLine.value * 100).toFixed(1).replace(/\.0$/, '')}%`,
+)
 
 /**
  * 画布几何随视口切换，而不是把一块 1000 单位的画布等比压扁。
@@ -94,7 +105,7 @@ function pointAnchor(index: number): string {
 }
 
 const thresholdVisible = computed(
-  () => THRESHOLD >= domain.value.low && THRESHOLD <= domain.value.high,
+  () => passLine.value >= domain.value.low && passLine.value <= domain.value.high,
 )
 
 const showEveryLabel = computed(() => (narrow.value || props.points.length > 8 ? 2 : 1))
@@ -149,19 +160,19 @@ const description = computed(() => {
           </template>
         </g>
 
-        <!-- 判定线：失败率 5% 的边界，即通过率 95% -->
+        <!-- 判读线：与后端结论使用的通过率分界保持一致 -->
         <template v-if="thresholdVisible">
           <line
             :x1="geo.pad.left"
             :x2="geo.width - geo.pad.right"
-            :y1="yFor(THRESHOLD)"
-            :y2="yFor(THRESHOLD)"
+            :y1="yFor(passLine)"
+            :y2="yFor(passLine)"
             stroke="var(--ink-3)"
             stroke-width="1"
             stroke-dasharray="3 4"
           />
-          <text :x="geo.width - geo.pad.right" :y="yFor(THRESHOLD) - 7" text-anchor="end" class="trend__threshold">
-            95% 判定线
+          <text :x="geo.width - geo.pad.right" :y="yFor(passLine) - 7" text-anchor="end" class="trend__threshold">
+            {{ passLineLabel }} 判读线
           </text>
         </template>
 
@@ -203,7 +214,7 @@ const description = computed(() => {
         </li>
         <li class="trend__legend-rule">
           <i class="trend__dash" aria-hidden="true" />
-          95% 判定线
+          {{ passLineLabel }} 判读线
         </li>
         <li class="trend__legend-rule">
           <i class="trend__line" aria-hidden="true" />

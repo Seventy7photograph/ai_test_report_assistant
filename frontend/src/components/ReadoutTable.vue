@@ -29,6 +29,7 @@ const rows = computed<Row[]>(() => {
       { key: 'blocked', label: '阻塞', value: '——', unit: '条', mark: 'var(--blocked-fill)' },
       { key: 'skipped', label: '未执行', value: '——', unit: '条', mark: 'var(--skipped-fill)' },
       { key: 'execution', label: '执行率', value: '——' },
+      { key: 'effective', label: '有效通过率', value: '——' },
       { key: 'defects', label: '缺陷 · 未关闭 / 总数', value: '——' },
     ]
   }
@@ -53,6 +54,12 @@ const rows = computed<Row[]>(() => {
     { key: 'blocked', label: '阻塞', value: String(m.blocked), unit: '条', mark: 'var(--blocked-fill)' },
     { key: 'skipped', label: '未执行', value: String(m.skipped), unit: '条', mark: 'var(--skipped-fill)' },
     { key: 'execution', label: '执行率', value: percent(m.execution_rate) },
+    {
+      key: 'effective',
+      label: '有效通过率',
+      value: percent(m.effective_pass_rate),
+      note: `分母 ${m.executed}`,
+    },
     {
       key: 'defects',
       label: '缺陷 · 未关闭 / 总数',
@@ -86,6 +93,10 @@ const isLocked = computed(() => props.metrics !== null && props.phase === 'press
       </dd>
     </div>
   </dl>
+
+  <p v-if="metrics" class="readout__legend">
+    通过率 = 通过 ÷ 用例总数（{{ metrics.total }} 条，未执行计入分母）；有效通过率 = 通过 ÷ 已执行条数。
+  </p>
 </template>
 
 <style scoped>
@@ -106,6 +117,15 @@ const isLocked = computed(() => props.metrics !== null && props.phase === 'press
 
 .readout__row:last-child {
   border-bottom: 0;
+}
+
+.readout__legend {
+  margin: 0;
+  padding: 10px var(--space-4) 0;
+  border-top: var(--hairline-soft);
+  font-size: var(--fs-micro);
+  line-height: 1.6;
+  color: var(--ink-3);
 }
 
 .readout__label {

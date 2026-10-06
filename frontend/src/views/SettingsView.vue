@@ -5,7 +5,7 @@ import { Check, Delete, Position, Refresh } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import SpecList from '@/components/SpecList.vue'
 import { api } from '@/api/client'
-import type { LLMSettingsView, LLMTestResult } from '@/api/types'
+import type { LLMSettingsView, LLMTestResult, VerdictThresholds } from '@/api/types'
 import { useSystem } from '@/stores/system'
 
 const router = useRouter()
@@ -26,6 +26,42 @@ const temperature = ref<number | null>(null)
 const timeout = ref<number | null>(null)
 const maxRetries = ref<number | null>(null)
 
+/**
+ * 阈值在界面上按「百分比」呈现（测试同学的口径），只在收发时换算成 0–1，
+ * 避免把 5 直接发给后端被夹成 5%。
+ */
+const failRate = ref<number | null>(null)
+const blockedRate = ref<number | null>(null)
+const executionFloor = ref<number | null>(null)
+const passLine = ref<number | null>(null)
+
+function toPercent(value: number | undefined | null): number | null {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.round(value * 1000) / 10
+    : null
+}
+
+function toRatio(value: number | null): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  return Math.round(Math.min(Math.max(value / 100, 0), 1) * 10000) / 10000
+}
+
+/** 只提交填了值的项；留空的项不提交，由后端逐项回落到 .env。 */
+function thresholdPayload(): Partial<VerdictThresholds> {
+  const entries: [keyof VerdictThresholds, number | null][] = [
+    ['fail_rate', failRate.value],
+    ['blocked_rate', blockedRate.value],
+    ['execution_floor', executionFloor.value],
+    ['pass_line', passLine.value],
+  ]
+  const payload: Partial<VerdictThresholds> = {}
+  for (const [key, value] of entries) {
+    const ratio = toRatio(value)
+    if (ratio != null) payload[key] = ratio
+  }
+  return payload
+}
+
 const probe = ref<LLMTestResult | null>(null)
 const probeError = ref<string | null>(null)
 
@@ -44,6 +80,10 @@ function applyView(value: LLMSettingsView) {
   temperature.value = value.temperature
   timeout.value = value.timeout
   maxRetries.value = value.max_retries
+  failRate.value = toPercent(value.thresholds?.fail_rate)
+  blockedRate.value = toPercent(value.thresholds?.blocked_rate)
+  executionFloor.value = toPercent(value.thresholds?.execution_floor)
+  passLine.value = toPercent(value.thresholds?.pass_line)
   apiKey.value = ''
   clearKey.value = false
 }
@@ -74,6 +114,7 @@ const hasSaved = computed(() =>
 const dirty = computed(() => {
   const value = view.value
   if (!value) return false
+  const thresholds = value.thresholds
   return (
     baseUrl.value.trim() !== value.base_url ||
     model.value.trim() !== value.model ||
@@ -81,9 +122,20 @@ const dirty = computed(() => {
     temperature.value !== value.temperature ||
     timeout.value !== value.timeout ||
     maxRetries.value !== value.max_retries ||
+    failRate.value !== toPercent(thresholds?.fail_rate) ||
+    blockedRate.value !== toPercent(thresholds?.blocked_rate) ||
+    executionFloor.value !== toPercent(thresholds?.execution_floor) ||
+    passLine.value !== toPercent(thresholds?.pass_line) ||
     apiKey.value.trim().length > 0 ||
     clearKey.value
   )
+})
+
+const thresholdEnvHint = computed(() => {
+  const env = view.value?.env?.thresholds
+  if (!env) return ''
+  const show = (value: number) => `${(Math.round(value * 1000) / 10).toString()}%`
+  return `失败率 ≤${show(env.fail_rate)} · 阻塞率 ≤${show(env.blocked_rate)} · 执行率 ≥${show(env.execution_floor)} · 判读线 ${show(env.pass_line)}`
 })
 
 const keyHint = computed(() => {
@@ -116,6 +168,7 @@ async function save() {
       temperature: temperature.value,
       timeout: timeout.value,
       max_retries: maxRetries.value,
+      thresholds: thresholdPayload(),
       api_key: apiKey.value.trim() || null,
       clear_api_key: clearKey.value,
     }
@@ -335,6 +388,80 @@ onMounted(refreshAll)
       </div>
     </section>
 
+    <section class="panel">
+      <header class="panel__head">
+        <h2 class="panel__title">判定阈值</h2>
+        <span class="panel__meta">留空回落到 .env</span>
+      </header>
+
+      <div class="form">
+        <div class="form__row">
+          <label class="field">
+            <span class="field__label">
+              失败率上限
+              <em class="tag" :class="isSaved('thresholds') ? 'is-saved' : ''">{{ sourceOf('thresholds') }}</em>
+            </span>
+            <el-input-number
+              v-model="failRate"
+              :min="0"
+              :max="100"
+              :step="0.5"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="field__hint">失败占比高于它 → 有条件通过</span>
+          </label>
+
+          <label class="field">
+            <span class="field__label">阻塞率上限</span>
+            <el-input-number
+              v-model="blockedRate"
+              :min="0"
+              :max="100"
+              :step="0.5"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="field__hint">阻塞占比高于它 → 有条件通过</span>
+          </label>
+
+          <label class="field">
+            <span class="field__label">执行率下限</span>
+            <el-input-number
+              v-model="executionFloor"
+              :min="0"
+              :max="100"
+              :step="1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="field__hint">低于它 → 结论覆盖不到全量</span>
+          </label>
+
+          <label class="field">
+            <span class="field__label">趋势判读线</span>
+            <el-input-number
+              v-model="passLine"
+              :min="0"
+              :max="100"
+              :step="1"
+              :precision="1"
+              controls-position="right"
+            />
+            <span class="field__hint">趋势图里虚线的高度</span>
+          </label>
+        </div>
+
+        <p v-if="thresholdEnvHint" class="form__hint">.env 默认：{{ thresholdEnvHint }}</p>
+        <p class="form__hint">单位 %。四项全留空并保存 = 整体回落 .env；报告里的「判定依据」会写明本次实际使用的阈值。</p>
+
+        <div class="form__actions">
+          <el-button type="primary" :icon="Check" :loading="saving" @click="save">保存配置</el-button>
+          <span v-if="dirty" class="form__dirty">有未保存的改动</span>
+        </div>
+      </div>
+    </section>
+
     <div class="settings__grid">
       <div class="settings__col">
         <section class="panel">
@@ -515,6 +642,13 @@ onMounted(refreshAll)
 .form__dirty {
   font-size: var(--fs-micro);
   color: var(--blocked);
+}
+
+.form__hint {
+  margin: 0;
+  font-size: var(--fs-micro);
+  line-height: 1.7;
+  color: var(--ink-3);
 }
 
 .probe__result {
