@@ -1,0 +1,274 @@
+/* ------------------------------------------------------------------
+   基础层：重置、排印、浏览器自带表面（选区 / 光标 / 滚动条 / 焦点环）
+   ------------------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--face);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+dl,
+dd,
+dt {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 浏览器表面：选区、光标、滚动条、焦点环 —— 都从调色板上取色 */
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+input,
+textarea,
+[contenteditable] {
+  caret-color: var(--accent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+  background-clip: content-box;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 读数一律用等宽 + 表格数字，小数点自然对齐 */
+.num,
+.readout__value,
+.data-table td,
+.data-table th {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.u-micro {
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.u-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------
+   面板与分格：世界只提供线，不提供影
+   ------------------------------------------------------------------ */
+
+.panel {
+  background: var(--sheet);
+  border: var(--hairline);
+  border-radius: var(--radius);
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  border-bottom: var(--hairline);
+  min-height: 42px;
+}
+
+.panel__title {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.panel__body {
+  padding: var(--space-4);
+}
+
+.rule-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.rule-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule-soft);
+}
+
+/* ------------------------------------------------------------------
+   签名动作：定值
+   未定值 = 青色 + 虚线基线；定值 = 墨色 + 基线由左向右画实
+   ------------------------------------------------------------------ */
+
+.readout__value {
+  position: relative;
+  color: var(--accent);
+  border-bottom: 1px dashed var(--accent);
+  padding-bottom: 1px;
+  transition: color 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.readout__value--locked {
+  color: var(--ink);
+  border-bottom-color: transparent;
+}
+
+.readout__value--locked::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--ink);
+  transform-origin: left center;
+  animation: rule-draw 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 判定章：钢印压入 */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 16px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
+  transform: rotate(-3deg);
+  white-space: nowrap;
+}
+
+.stamp--pressed {
+  animation: stamp-press 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stamp-press {
+  0% {
+    opacity: 0;
+    transform: rotate(-3deg) scale(1.4);
+    filter: blur(4px);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(-3deg) scale(0.97);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
+.stamp--pass {
+  color: var(--pass);
+}
+
+.stamp--conditional {
+  color: var(--blocked);
+}
+
+.stamp--reject {
+  color: var(--fail);
+}
+
+.stamp--unknown {
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

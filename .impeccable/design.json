@@ -1,0 +1,668 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T21:09:30+08:00",
+  "title": "Design System: AI 测试报告助手",
+  "extensions": {
+    "colorMeta": {
+      "case": {
+        "role": "neutral",
+        "displayName": "机箱石墨",
+        "canonical": "#1c1f23",
+        "oklch": "oklch(23.8% 0.009 255.6)",
+        "purpose": "顶栏地面：整台仪器未被照亮的机身。",
+        "tonalRamp": [
+          "#090b0f",
+          "#2b2e32",
+          "#4a4d52",
+          "#6e7277",
+          "#95999e",
+          "#babec3",
+          "#d7dbe1",
+          "#edeef0"
+        ]
+      },
+      "case-line": {
+        "role": "neutral",
+        "displayName": "机箱线",
+        "canonical": "#34393f",
+        "oklch": "oklch(34.2% 0.013 253.0)",
+        "purpose": "机箱底边分界，1px。",
+        "tonalRamp": [
+          "#080c10",
+          "#292e34",
+          "#484e54",
+          "#6d7279",
+          "#9399a0",
+          "#b8bec6",
+          "#d5dbe3",
+          "#eceff1"
+        ]
+      },
+      "case-ink": {
+        "role": "neutral",
+        "displayName": "机箱字",
+        "canonical": "#e9ebe7",
+        "oklch": "oklch(93.7% 0.006 128.5)",
+        "purpose": "暗底上的主文字与当前页签。",
+        "tonalRamp": [
+          "#0a0c09",
+          "#2d2e2b",
+          "#4c4e4a",
+          "#70726f",
+          "#979995",
+          "#bcbebb",
+          "#d9dbd7",
+          "#eeefed"
+        ]
+      },
+      "case-ink-2": {
+        "role": "neutral",
+        "displayName": "机箱次字",
+        "canonical": "#9aa1a8",
+        "oklch": "oklch(70.6% 0.013 248.0)",
+        "purpose": "暗底上的标签与未激活页签。",
+        "tonalRamp": [
+          "#070c10",
+          "#292f34",
+          "#484e54",
+          "#6c7279",
+          "#9299a0",
+          "#b7bfc6",
+          "#d4dce3",
+          "#eceff1"
+        ]
+      },
+      "case-accent": {
+        "role": "primary",
+        "displayName": "机箱青",
+        "canonical": "#4fb3ba",
+        "oklch": "oklch(71.1% 0.093 201.6)",
+        "purpose": "同一色相在石墨底上的高亮版本：铭牌图标与页签指示块。",
+        "tonalRamp": [
+          "#00131b",
+          "#003a41",
+          "#005b62",
+          "#038188",
+          "#44a9b0",
+          "#6dd0d7",
+          "#8beef5",
+          "#d6f6f8"
+        ]
+      },
+      "face": {
+        "role": "neutral",
+        "displayName": "面板纸",
+        "canonical": "#f4f4f1",
+        "oklch": "oklch(96.6% 0.004 106.5)",
+        "purpose": "工作面底色，也是表头、告警条与面板脚的底。",
+        "tonalRamp": [
+          "#0b0b09",
+          "#2e2e2c",
+          "#4d4d4b",
+          "#72726f",
+          "#989896",
+          "#bebebb",
+          "#dbdbd8",
+          "#eeeeed"
+        ]
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "内页白",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "purpose": "面板与表格背景；必须比面板纸更亮，用来切出读数框。",
+        "tonalRamp": [
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff",
+          "#ffffff"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "墨",
+        "canonical": "#14171a",
+        "oklch": "oklch(20.3% 0.008 248.2)",
+        "purpose": "主文字，以及所有已定值读数的颜色。",
+        "tonalRamp": [
+          "#090b0e",
+          "#2b2e32",
+          "#4a4d51",
+          "#6e7276",
+          "#95999d",
+          "#babec2",
+          "#d7dbe0",
+          "#edeff0"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "墨二级",
+        "canonical": "#5a6068",
+        "oklch": "oklch(48.7% 0.015 255.6)",
+        "purpose": "次级说明与表格单元文字。",
+        "tonalRamp": [
+          "#070b11",
+          "#292e35",
+          "#484e55",
+          "#6c727a",
+          "#9299a2",
+          "#b8bec7",
+          "#d4dbe5",
+          "#eceff2"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "墨三级",
+        "canonical": "#656b73",
+        "oklch": "oklch(52.5% 0.015 255.6)",
+        "purpose": "刻印标签、表头、元信息与空态读数。",
+        "tonalRamp": [
+          "#070b11",
+          "#292e35",
+          "#484e55",
+          "#6c727a",
+          "#9299a1",
+          "#b8bec7",
+          "#d5dbe5",
+          "#eceff2"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "发丝线",
+        "canonical": "#d3d6d2",
+        "oklch": "oklch(87.3% 0.006 137.8)",
+        "purpose": "结构性分界：面板边、面板头下沿、表头下沿。",
+        "tonalRamp": [
+          "#0a0c09",
+          "#2c2f2b",
+          "#4b4e4b",
+          "#70726f",
+          "#969995",
+          "#bcbfbb",
+          "#d9dcd8",
+          "#eeefed"
+        ]
+      },
+      "rule-soft": {
+        "role": "neutral",
+        "displayName": "细发丝线",
+        "canonical": "#e6e8e4",
+        "oklch": "oklch(92.8% 0.006 128.5)",
+        "purpose": "面板内部的逐行分界。",
+        "tonalRamp": [
+          "#0a0c09",
+          "#2d2e2b",
+          "#4c4e4a",
+          "#70726f",
+          "#979995",
+          "#bcbebb",
+          "#d9dbd7",
+          "#eeefed"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "电光青",
+        "canonical": "#17787f",
+        "oklch": "oklch(52.4% 0.084 202.5)",
+        "purpose": "唯一强调色。语义是尚未定值：未定值读数、焦点环、默认按钮 hover。",
+        "tonalRamp": [
+          "#00121a",
+          "#003940",
+          "#005a61",
+          "#238087",
+          "#51a8af",
+          "#78ced5",
+          "#96ecf3",
+          "#d9f5f7"
+        ]
+      },
+      "accent-weak": {
+        "role": "primary",
+        "displayName": "青雾",
+        "canonical": "#e8f1f2",
+        "oklch": "oklch(95.2% 0.010 204.9)",
+        "purpose": "焦点外环与 hover 底的薄层。",
+        "tonalRamp": [
+          "#070c0d",
+          "#282f30",
+          "#474f50",
+          "#6b7374",
+          "#929a9b",
+          "#b7c0c1",
+          "#d4ddde",
+          "#ecefef"
+        ]
+      },
+      "pass": {
+        "role": "secondary",
+        "displayName": "通过绿",
+        "canonical": "#2e7d53",
+        "oklch": "oklch(52.9% 0.102 156.8)",
+        "purpose": "通过用例、已修复缺陷、建议发版的文字与描边。",
+        "tonalRamp": [
+          "#001500",
+          "#003c16",
+          "#005d35",
+          "#358359",
+          "#5eab7f",
+          "#84d2a3",
+          "#a1f0c0",
+          "#dcf6e5"
+        ]
+      },
+      "pass-fill": {
+        "role": "secondary",
+        "displayName": "色块绿",
+        "canonical": "#3e8f63",
+        "oklch": "oklch(58.7% 0.105 157.1)",
+        "purpose": "同一语义的实心色块版本。",
+        "tonalRamp": [
+          "#001500",
+          "#003c16",
+          "#005d35",
+          "#328458",
+          "#5cac7e",
+          "#82d2a3",
+          "#9ff0bf",
+          "#dbf6e5"
+        ]
+      },
+      "fail": {
+        "role": "secondary",
+        "displayName": "失败红",
+        "canonical": "#b02a20",
+        "oklch": "oklch(49.9% 0.172 29.1)",
+        "purpose": "失败用例、未关闭缺陷、P0、不建议发版的文字与描边。",
+        "tonalRamp": [
+          "#360000",
+          "#680000",
+          "#90120c",
+          "#bd4236",
+          "#ea6c5c",
+          "#ff9280",
+          "#ffaf9c",
+          "#ffe1d9"
+        ]
+      },
+      "fail-fill": {
+        "role": "secondary",
+        "displayName": "色块红",
+        "canonical": "#c0342a",
+        "oklch": "oklch(53.8% 0.178 28.6)",
+        "purpose": "同一语义的实心色块版本。",
+        "tonalRamp": [
+          "#360000",
+          "#680000",
+          "#90120e",
+          "#bd4237",
+          "#ea6c5d",
+          "#ff9281",
+          "#ffaf9d",
+          "#ffe1d9"
+        ]
+      },
+      "blocked": {
+        "role": "secondary",
+        "displayName": "阻塞琥珀",
+        "canonical": "#8f6010",
+        "oklch": "oklch(52.7% 0.106 73.8)",
+        "purpose": "阻塞用例、P1、告警条、有条件通过的文字与描边；比填充版更深以保住对比度。",
+        "tonalRamp": [
+          "#220000",
+          "#4c2100",
+          "#6f4200",
+          "#96671b",
+          "#bf8e48",
+          "#e7b36d",
+          "#ffd08a",
+          "#feebd4"
+        ]
+      },
+      "blocked-fill": {
+        "role": "secondary",
+        "displayName": "色块琥珀",
+        "canonical": "#b57a12",
+        "oklch": "oklch(62.5% 0.128 73.9)",
+        "purpose": "同一语义的实心色块版本。",
+        "tonalRamp": [
+          "#260000",
+          "#511c00",
+          "#753e00",
+          "#9d6300",
+          "#c78b2d",
+          "#efb057",
+          "#ffce75",
+          "#ffebce"
+        ]
+      },
+      "skipped": {
+        "role": "secondary",
+        "displayName": "跳过灰",
+        "canonical": "#62686f",
+        "oklch": "oklch(51.5% 0.013 252.2)",
+        "purpose": "未执行用例、无法判定、已驳回的文字与描边。",
+        "tonalRamp": [
+          "#070c11",
+          "#292e34",
+          "#484e54",
+          "#6c7279",
+          "#9399a0",
+          "#b8bec6",
+          "#d5dbe4",
+          "#eceff2"
+        ]
+      },
+      "skipped-fill": {
+        "role": "secondary",
+        "displayName": "色块灰",
+        "canonical": "#7c838a",
+        "oklch": "oklch(60.6% 0.013 248.1)",
+        "purpose": "同一语义的实心色块版本。",
+        "tonalRamp": [
+          "#070c11",
+          "#292f34",
+          "#474e54",
+          "#6c7279",
+          "#9299a0",
+          "#b7bfc6",
+          "#d4dce3",
+          "#eceff1"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "readout": {
+        "displayName": "读数",
+        "purpose": "面板关键数字：等宽 + 表格数字，右对齐，单位另起一列小字。"
+      },
+      "title": {
+        "displayName": "页面标题",
+        "purpose": "宋体，视图级标题，每屏只出现一次。"
+      },
+      "body": {
+        "displayName": "报告正文",
+        "purpose": "宋体，模型生成的报告正文，宽松行高，最大 74ch。"
+      },
+      "ui": {
+        "displayName": "界面正文",
+        "purpose": "黑体，全站默认字号：表格、说明、按钮。"
+      },
+      "label": {
+        "displayName": "刻印标签",
+        "purpose": "黑体 11px 大写拉开字距：字段名、表头、眉标。"
+      }
+    },
+    "shadows": [],
+    "shadowPolicy": "零阴影是硬约束。全站与 Element Plus 的阴影变量都被显式设为 none；层次由地面明度（机箱石墨 → 面板纸 → 内页白）与 1px 线表达，浮层只用 1px 边框 + 白底。",
+    "motion": [
+      {
+        "name": "ease-signature",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "签名缓动：定值基线、钢印压入、页签指示块。"
+      },
+      {
+        "name": "ease-control",
+        "value": "ease-out",
+        "purpose": "控件状态过渡（输入框、按钮、chip）。"
+      },
+      {
+        "name": "duration-control",
+        "value": "120ms",
+        "purpose": "控件 hover / focus 过渡。"
+      },
+      {
+        "name": "duration-readout-lock",
+        "value": "320ms",
+        "purpose": "读数由青转墨的颜色过渡。"
+      },
+      {
+        "name": "duration-stamp-press",
+        "value": "480ms",
+        "purpose": "判定钢印压入。"
+      },
+      {
+        "name": "duration-rule-draw",
+        "value": "620ms",
+        "purpose": "定值基线由左向右画实。"
+      },
+      {
+        "name": "duration-caret-blink",
+        "value": "1.05s steps(1, end)",
+        "purpose": "流式生成时的光标闪烁。"
+      },
+      {
+        "name": "duration-pulse",
+        "value": "1.1s ease-in-out",
+        "purpose": "生成中等待指示块的呼吸。"
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "prefers-reduced-motion 下全部动画与过渡被压到不可见。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "shell-narrow",
+        "value": "560px",
+        "purpose": "顶栏压缩、隐藏版本号；读数降到 18px；判定块纵向堆叠。"
+      },
+      {
+        "name": "compact",
+        "value": "720px",
+        "purpose": "内容内边距收紧；趋势图换窄画布几何；缺陷表单元收紧。"
+      },
+      {
+        "name": "nav-min",
+        "value": "860px",
+        "purpose": "隐藏顶栏全部实时读数。"
+      },
+      {
+        "name": "settings",
+        "value": "1000px",
+        "purpose": "隐藏送检栏底部提示文案。"
+      },
+      {
+        "name": "stack",
+        "value": "1080px",
+        "purpose": "工作台与报告详情并成单栏；顶栏隐藏模型读数。"
+      }
+    ],
+    "layout": {
+      "shellHeight": "56px",
+      "pageMax": "1480px",
+      "settingsMax": "1100px",
+      "panelGap": "16px",
+      "workbenchColumns": "minmax(320px, 400px) minmax(0, 1fr)",
+      "reportColumns": "minmax(0, 1fr) minmax(0, 1.35fr)",
+      "settingsColumns": "repeat(auto-fit, minmax(340px, 1fr))",
+      "mainPadding": "24px 24px 48px",
+      "mainPaddingNarrow": "16px 12px 32px"
+    },
+    "signatureMove": {
+      "name": "定值",
+      "pending": "未定值：读数电光青 + 1px 虚线基线（数据已贴入、指标已算出、报告未生成）。",
+      "locked": "已定值：读数转墨色，虚线消失，基线由左向右画实（620ms），判定以钢印压入（480ms）。",
+      "scope": "整站只有这一个时间性动作。"
+    }
+  },
+  "components": [
+    {
+      "name": "读数行",
+      "kind": "custom",
+      "refersTo": "readout-value",
+      "description": "面板上的检验项目表：左标签（可带状态色块）+ 右值（读数 / 单位 / 百分比注）。同时展示未定值、已定值、空三种状态。",
+      "html": "<div class=\"ds-readout\">\n  <div class=\"ds-readout__row\">\n    <span class=\"ds-readout__label\"><i class=\"ds-readout__mark\"></i>通过</span>\n    <span class=\"ds-readout__cell\">\n      <span class=\"ds-readout__value\">468</span>\n      <span class=\"ds-readout__unit\">条</span>\n      <span class=\"ds-readout__note\">93.6%</span>\n    </span>\n  </div>\n  <div class=\"ds-readout__row\">\n    <span class=\"ds-readout__label\"><i class=\"ds-readout__mark ds-readout__mark--fail\"></i>失败</span>\n    <span class=\"ds-readout__cell\">\n      <span class=\"ds-readout__value ds-readout__value--locked\">22</span>\n      <span class=\"ds-readout__unit\">条</span>\n      <span class=\"ds-readout__note\">4.4%</span>\n    </span>\n  </div>\n  <div class=\"ds-readout__row\">\n    <span class=\"ds-readout__label\">执行率</span>\n    <span class=\"ds-readout__cell\">\n      <span class=\"ds-readout__value ds-readout__value--empty\">——</span>\n    </span>\n  </div>\n</div>",
+      "css": ".ds-readout { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); font-family: var(--font-ui); }\n.ds-readout__row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 9px 16px; border-bottom: 1px solid var(--rule-soft); }\n.ds-readout__row:last-child { border-bottom: 0; }\n.ds-readout__label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); letter-spacing: 0.02em; }\n.ds-readout__mark { width: 6px; height: 6px; border-radius: 1px; background: var(--pass-fill); flex-shrink: 0; transform: translateY(-1px); }\n.ds-readout__mark--fail { background: var(--fail-fill); }\n.ds-readout__cell { display: grid; grid-template-columns: minmax(48px, auto) 2.2em minmax(52px, auto); align-items: baseline; gap: 6px; text-align: right; }\n.ds-readout__value { position: relative; justify-self: end; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 21px; line-height: 1.2; letter-spacing: -0.01em; color: var(--accent); border-bottom: 1px dashed var(--accent); padding-bottom: 1px; transition: color 320ms cubic-bezier(0.16, 1, 0.3, 1); }\n.ds-readout__value--locked { color: var(--ink); border-bottom-color: transparent; }\n.ds-readout__value--locked::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--ink); transform-origin: left center; animation: ds-rule-draw 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }\n.ds-readout__value--empty { color: var(--ink-3); border-bottom: 1px dashed var(--rule); }\n.ds-readout__unit, .ds-readout__note { justify-self: end; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--ink-3); }\n@keyframes ds-rule-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }"
+    },
+    {
+      "name": "判定钢印",
+      "kind": "custom",
+      "refersTo": "stamp-reject",
+      "description": "签名动作的终点：判定以 rotate(-3deg) 的钢印压入，右侧列出判定依据。",
+      "html": "<div class=\"ds-verdict\">\n  <span class=\"ds-stamp\">不建议发版</span>\n  <div class=\"ds-verdict__reasons\">\n    <p class=\"ds-rule-label\">判定依据</p>\n    <ul class=\"ds-verdict__list\">\n      <li>存在 1 条未关闭的 P0 缺陷</li>\n      <li>用例失败率 4.4%，高于 5% 判定线内侧</li>\n    </ul>\n  </div>\n</div>",
+      "css": ".ds-verdict { display: flex; align-items: flex-start; gap: 24px; padding: 16px; border-bottom: 1px solid var(--rule-soft); font-family: var(--font-ui); background: var(--sheet); }\n.ds-stamp { display: inline-flex; align-items: center; justify-content: center; padding: 7px 16px; border: 2px solid currentColor; border-radius: 2px; color: var(--fail); font-size: 15px; font-weight: 700; letter-spacing: 0.22em; text-indent: 0.22em; white-space: nowrap; transform: rotate(-3deg); animation: ds-stamp-press 480ms cubic-bezier(0.16, 1, 0.3, 1) both; }\n.ds-verdict__reasons { flex: 1; min-width: 0; }\n.ds-rule-label { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }\n.ds-rule-label::after { content: \"\"; flex: 1; height: 1px; background: var(--rule-soft); }\n.ds-verdict__list { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }\n.ds-verdict__list li { position: relative; padding-left: 14px; font-size: 12px; color: var(--ink-2); }\n.ds-verdict__list li::before { content: \"\"; position: absolute; left: 0; top: 0.62em; width: 5px; height: 1px; background: var(--ink-3); }\n@keyframes ds-stamp-press { 0% { opacity: 0; transform: rotate(-3deg) scale(1.4); filter: blur(4px); } 55% { opacity: 1; transform: rotate(-3deg) scale(0.97); filter: blur(0); } 100% { opacity: 1; transform: rotate(-3deg) scale(1); } }"
+    },
+    {
+      "name": "状态标记",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "状态只以 6px 实心方色块 + 文字出现；四个语义各一对文字色 / 色块色。",
+      "html": "<div class=\"ds-status-set\">\n  <span class=\"ds-status ds-status--pass\"><i class=\"ds-status__mark\"></i>已修复</span>\n  <span class=\"ds-status ds-status--fail\"><i class=\"ds-status__mark\"></i>未关闭</span>\n  <span class=\"ds-status ds-status--blocked\"><i class=\"ds-status__mark\"></i>阻塞</span>\n  <span class=\"ds-status ds-status--skipped\"><i class=\"ds-status__mark\"></i>无法判定</span>\n</div>",
+      "css": ".ds-status-set { display: flex; flex-wrap: wrap; gap: 20px; padding: 16px; background: var(--sheet); font-family: var(--font-ui); }\n.ds-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }\n.ds-status__mark { width: 6px; height: 6px; border-radius: 1px; flex-shrink: 0; }\n.ds-status--pass { color: var(--pass); }\n.ds-status--pass .ds-status__mark { background: var(--pass-fill); }\n.ds-status--fail { color: var(--fail); }\n.ds-status--fail .ds-status__mark { background: var(--fail-fill); }\n.ds-status--blocked { color: var(--blocked); }\n.ds-status--blocked .ds-status__mark { background: var(--blocked-fill); }\n.ds-status--skipped { color: var(--skipped); }\n.ds-status--skipped .ds-status__mark { background: var(--skipped-fill); }"
+    },
+    {
+      "name": "用例分布条",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "色块即数据：通过 / 失败 / 阻塞 / 未执行按用例数占比铺满一条 10px 高的分段条。",
+      "html": "<figure class=\"ds-dist\">\n  <div class=\"ds-dist__track\">\n    <span class=\"ds-dist__seg\" style=\"width: 93.6%; background: var(--pass-fill)\"></span>\n    <span class=\"ds-dist__seg\" style=\"width: 4.4%; background: var(--fail-fill)\"></span>\n    <span class=\"ds-dist__seg\" style=\"width: 2%; background: var(--blocked-fill)\"></span>\n  </div>\n  <figcaption class=\"ds-dist__caption\"><span>共 500 条</span><span>执行 490 条</span></figcaption>\n</figure>",
+      "css": ".ds-dist { margin: 0; padding: 12px 16px 16px; background: var(--sheet); font-family: var(--font-ui); }\n.ds-dist__track { display: flex; height: 10px; border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; background: var(--sheet); }\n.ds-dist__seg { display: block; height: 100%; }\n.ds-dist__seg + .ds-dist__seg { border-left: 1px solid var(--sheet); }\n.ds-dist__caption { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-family: var(--font-data); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-3); }"
+    },
+    {
+      "name": "读数框面板",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "世界的基本容器：白色内页、1px 发丝线、3px 圆角、零阴影；面板头左标题右等宽元信息。",
+      "html": "<section class=\"ds-panel\">\n  <header class=\"ds-panel__head\">\n    <h2 class=\"ds-panel__title\">读数</h2>\n    <span class=\"ds-panel__meta\">由服务端计算</span>\n  </header>\n  <div class=\"ds-panel__body\">面板内容</div>\n</section>",
+      "css": ".ds-panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); font-family: var(--font-ui); color: var(--ink); }\n.ds-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; min-height: 42px; border-bottom: 1px solid var(--rule); }\n.ds-panel__title { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--ink); }\n.ds-panel__meta { font-family: var(--font-data); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-3); text-align: right; }\n.ds-panel__body { padding: 16px; font-size: 13px; line-height: 1.6; }"
+    },
+    {
+      "name": "预设 chip",
+      "kind": "chip",
+      "refersTo": "preset-chip",
+      "description": "把一段分析要求填进输入框的动作按钮，不是筛选状态，因此没有选中态。",
+      "html": "<div class=\"ds-chips\">\n  <button type=\"button\" class=\"ds-chip\">发版评估</button>\n  <button type=\"button\" class=\"ds-chip\">回归建议</button>\n  <button type=\"button\" class=\"ds-chip\">缺陷复盘</button>\n</div>",
+      "css": ".ds-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px; background: var(--sheet); }\n.ds-chip { padding: 3px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--sheet); color: var(--ink-2); font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.04em; cursor: pointer; transition: border-color 120ms ease-out, color 120ms ease-out; }\n.ds-chip:hover { border-color: var(--accent); color: var(--accent); }\n.ds-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }"
+    },
+    {
+      "name": "主按钮",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "墨底白字的重色动作（生成报告）；墨 = 已定值，hover 才亮成电光青。",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\">\n  <svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\" aria-hidden=\"true\">\n    <path d=\"M3 11.5 21 3l-8.5 18-2.2-7.3L3 11.5Z\" />\n  </svg>\n  生成报告\n</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 8px 15px; border: 1px solid var(--ink); border-radius: var(--radius); background: var(--ink); color: var(--sheet); font-family: var(--font-ui); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; }\n.ds-btn-primary:hover { background: var(--accent); border-color: var(--accent); }\n.ds-btn-primary:active { background: var(--accent); border-color: var(--accent); }\n.ds-btn-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "次按钮",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "白底发丝线描边的次级动作（导出、刷新、清空）；hover 转青雾底与电光青文字。",
+      "html": "<button type=\"button\" class=\"ds-btn-default\">Markdown</button>",
+      "css": ".ds-btn-default { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 8px 15px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--sheet); color: var(--ink-2); font-family: var(--font-ui); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; }\n.ds-btn-default:hover { background: var(--accent-weak); border-color: var(--accent); color: var(--accent); }\n.ds-btn-default:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "机箱导航条",
+      "kind": "nav",
+      "refersTo": "case",
+      "description": "56px 石墨顶栏：铭牌 + 模式页签（2px 青色指示块）+ 右侧实时读数与 1px 描边的 7px 状态灯。",
+      "html": "<header class=\"ds-case\">\n  <span class=\"ds-case__plate\">\n    <svg class=\"ds-case__mark\" viewBox=\"0 0 22 22\" width=\"20\" height=\"20\" fill=\"none\" aria-hidden=\"true\">\n      <path d=\"M1 15.5h20M5 15.5v-5M11 15.5v-9M17 15.5v-5M11 1.5V5.4\" stroke=\"currentColor\" stroke-width=\"1\" />\n    </svg>\n    AI 测试报告助手\n  </span>\n  <nav class=\"ds-case__modes\">\n    <a class=\"ds-case__mode is-active\" href=\"#\">工作台</a>\n    <a class=\"ds-case__mode\" href=\"#\">档案</a>\n    <a class=\"ds-case__mode\" href=\"#\">设置</a>\n  </nav>\n  <dl class=\"ds-case__readout\">\n    <dt>服务</dt>\n    <dd><span class=\"ds-case__led is-on\"></span>就绪</dd>\n  </dl>\n</header>",
+      "css": ".ds-case { display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 24px; background: var(--case); border-bottom: 1px solid var(--case-line); color: var(--case-ink); font-family: var(--font-ui); }\n.ds-case__plate { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.06em; }\n.ds-case__mark { color: var(--case-accent); }\n.ds-case__modes { display: flex; align-items: stretch; height: 100%; gap: 4px; }\n.ds-case__mode { position: relative; display: inline-flex; align-items: center; padding: 0 12px; color: var(--case-ink-2); font-size: 12px; letter-spacing: 0.08em; text-decoration: none; transition: color 140ms ease-out; }\n.ds-case__mode::after { content: \"\"; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; background: var(--case-accent); transform: scaleX(0); transform-origin: left center; transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1); }\n.ds-case__mode:hover { color: var(--case-ink); }\n.ds-case__mode:hover::after { transform: scaleX(0.4); }\n.ds-case__mode.is-active { color: var(--case-ink); }\n.ds-case__mode.is-active::after { transform: scaleX(1); }\n.ds-case__readout { display: flex; flex-direction: column; gap: 1px; margin: 0 0 0 auto; }\n.ds-case__readout dt { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--case-ink-2); }\n.ds-case__readout dd { display: flex; align-items: center; gap: 6px; margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--case-ink); }\n.ds-case__led { width: 7px; height: 7px; border-radius: 1px; border: 1px solid var(--case-ink-2); flex-shrink: 0; }\n.ds-case__led.is-on { border-color: var(--pass-fill); background: var(--pass-fill); }"
+    },
+    {
+      "name": "刻印标签",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "字段名与表头的母语：11px、字距 0.14em、大写、墨三级，后接一条自动延伸的细发丝线。",
+      "html": "<p class=\"ds-rule-label\">判定依据</p>",
+      "css": ".ds-rule-label { display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 16px; font-family: var(--font-ui); font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; background: var(--sheet); }\n.ds-rule-label::after { content: \"\"; flex: 1; height: 1px; background: var(--rule-soft); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "「计量台」",
+    "overview": "这个世界把界面当成一台计量仪器：机箱在上，读数面板在下，中间只有发丝线。产品要回答的唯一问题是\"这版能不能发\"，所以界面不写散文、不给结论卡片，只给读数——每个数有量程（单位）、有来源（服务端计算）、有判定（盖章）。数字右对齐成列、小数点对齐、单位另起一列小字；层次靠 1px 线和地面明度，不靠阴影、不靠留白堆砌、不靠\"大数字 + 小标签\"的营销卡。\n\n受限使用：只取仪器的排印、配色、密度与一个签名动作，不取仪器的物理外形。没有旋钮、没有表盘、没有机箱倒角、没有螺丝。它看起来像读数面板，不像一台设备。\n\n唯一的时间性动作是签名动作定值：数据贴入后读数以电光青 + 虚线基线亮起（未定值）；报告生成完成后落定为墨色、基线由左向右画实，判定以钢印压入。整站只有这一个动作，其余过渡克制到几乎看不见。",
+    "keyCharacteristics": [
+      "石墨机箱 + 纸白读数面板的双色地面；零阴影，层次只由 1px 线表达。",
+      "唯一强调色电光青，语义是\"尚未定值\"，不是装饰。",
+      "三种字体各司其职：黑体做界面、宋体做文书、等宽做读数。",
+      "高密度：13px 界面正文、9px 级行距、11px 刻印标签。",
+      "状态只以 6–7px 实心方色块出现，不用药丸、圆点、环形或光晕。",
+      "一个签名动作：定值（青色虚线 → 墨色实线 + 钢印）。"
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "电光青是唯一点缀色，一屏面积不超过约 5%。它的语义是\"尚未定值\"，不是\"品牌色\"。把它当作装饰色块、渐变起点或成功提示都越界——成功是绿，不是青。",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Tones Rule",
+        "body": "每个状态色都有文字版与填充版两个明度：文字与描边用深版，实心色块用亮版。不要在文字上放填充版，也不要在色块上放文字版。",
+        "section": "colors"
+      },
+      {
+        "name": "The Solid Block Rule",
+        "body": "状态一律是 6–7px 的实心方色块（1px 圆角）。不用药丸、圆点、环形、也不用带光晕的指示灯。色块是数据，不是徽章。",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "一切数字都用等宽 + tnum 表格数字，右对齐成列；单位与百分比放在独立的小字列里。永远不把单位拼进读数本身——\"500\"和\"条\"是两格，\"98.0%\"是墨三级的小字而不是读数的主色。",
+        "section": "typography"
+      },
+      {
+        "name": "The Stencil Label Rule",
+        "body": "字段名、表头、眉标一律用刻印标签的形制（11px、字距 0.14em、大写、墨三级），并让它可以跟一条自动延伸的细发丝线组成\"标签 + 长线\"。这是世界的原生标签动作——保留它，但不要把它放大或加粗成更响的标题。",
+        "section": "typography"
+      },
+      {
+        "name": "The Three Voices Rule",
+        "body": "黑体 = 界面，宋体 = 模型，等宽 = 计算。不要混用：不要把界面文案排成宋体，也不要把模型正文排成等宽。",
+        "section": "typography"
+      },
+      {
+        "name": "The Fixed 56 Rule",
+        "body": "顶栏恒为 56px 且 sticky。所有 sticky 子元素的上沿按 calc(var(--shell-height) + 16px) 计算，不写魔法数字。",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline Index Rule",
+        "body": "面板内部的每一行由一条细发丝线结束，最后一行不封边。不要用斑马纹，也不要用行间距代替线。",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Case Rule",
+        "body": "零阴影。任何\"浮起来\"的需求都用边框 + 地面明度解决，不用阴影、不用模糊、不用发光。",
+        "section": "elevation"
+      },
+      {
+        "name": "The Ring Not Glow Rule",
+        "body": "焦点是描边与圆环，不是光晕。输入焦点 = 1px 青色内描边 + 3px 青雾外环；状态灯 = 1px 描边 + 实心填充，不做 halo。",
+        "section": "elevation"
+      },
+      {
+        "name": "The Near-Square Rule",
+        "body": "状态指示是方块不是圆点：6–7px、1px 圆角。全站圆角上限 3px；任何超过 4px 的圆角都属于另一个世界。",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do 用 1px 发丝线分格、用地面明度分层次，绝不用阴影。",
+      "Do 把一切数字排成等宽 + 表格数字、右对齐，单位和百分比各占一列微字。",
+      "Do 用 6–7px 实心方色块表达状态（通过绿 / 失败红 / 阻塞琥珀 / 跳过灰）。",
+      "Do 保留刻印标签（11px、字距 0.14em、大写、墨三级）作为字段名与表头的母语。",
+      "Do 让每个读数遵守定值规则：未定值 = 电光青 + 虚线，已定值 = 墨 + 实线。",
+      "Do 控制圆角在 1–3px：面板 3px，chip 与钢印 2px，状态色块 1px。",
+      "Do 用宋体排模型写的报告正文与视图标题，用黑体排界面，用等宽排读数。"
+    ],
+    "donts": [
+      "Don't 加任何 box-shadow、发光、模糊或渐变（唯一的渐变是空态 45° 发丝斜纹）。浮层也没有阴影。",
+      "Don't 引入第二个强调色；电光青是唯一的，且只表示\"尚未定值\"。",
+      "Don't 把状态做成药丸、圆点、环形或带光晕的 LED；状态永远是实心方块。",
+      "Don't 用超过 4px 的圆角做卡片或按钮；这个世界是方角仪器。",
+      "Don't 把未定值的读数排成墨色，也不要把已定值的读数留成青色——颜色就是状态。",
+      "Don't 用系统 display 字体或衬线体排界面控件文字。",
+      "Don't 用 emoji 或字形图标；图标是 1px 描边的内联 SVG 或 Element Plus 图标组件。",
+      "Don't 把刻印标签放大成标题或加粗成眉标；它的 11px 与墨三级就是它的克制。"
+    ]
+  }
+}

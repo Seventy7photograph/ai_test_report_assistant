@@ -1,0 +1,70 @@
+/* ------------------------------------------------------------------
+   设计令牌
+   世界：计量仪器读数面板（受限：排印 / 配色 / 密度 / 一个签名动作）
+   - 机箱石墨 + 被照亮的读数面板
+   - 零阴影：所有层次由 1px 线表达
+   - 状态色只以实心小色块出现
+   ------------------------------------------------------------------ */
+
+:root {
+  /* 机箱 —— 顶栏 */
+  --case: #1c1f23;
+  --case-raised: #24282d;
+  --case-line: #34393f;
+  --case-ink: #e9ebe7;
+  --case-ink-2: #9aa1a8;
+  --case-accent: #4fb3ba;
+
+  /* 读数面板 —— 工作面 */
+  --face: #f4f4f1;
+  --sheet: #ffffff;
+  --ink: #14171a;
+  --ink-2: #5a6068;
+  --ink-3: #656b73;
+  --rule: #d3d6d2;
+  --rule-soft: #e6e8e4;
+
+  /* 指示色 */
+  --accent: #17787f;
+  --accent-weak: #e8f1f2;
+
+  /* 状态：文字用深色版本（≥4.5:1），色块用填充版本（≥3:1） */
+  --pass: #2e7d53;
+  --fail: #b02a20;
+  --blocked: #8f6010;
+  --skipped: #62686f;
+  --pass-fill: #3e8f63;
+  --fail-fill: #c0342a;
+  --blocked-fill: #b57a12;
+  --skipped-fill: #7c838a;
+
+  /* 排印：黑体做界面，宋体做文书，等宽做读数 */
+  --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Source Han Sans SC", system-ui, sans-serif;
+  --font-doc: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --font-data: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+
+  --fs-micro: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-readout: 21px;
+
+  /* 几何：仪表面板是方角，只有极小圆角 */
+  --radius: 3px;
+  --radius-lg: 4px;
+  --hairline: 1px solid var(--rule);
+  --hairline-soft: 1px solid var(--rule-soft);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --shell-height: 56px;
+  --page-max: 1480px;
+}
