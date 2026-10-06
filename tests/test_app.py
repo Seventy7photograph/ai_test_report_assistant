@@ -6,12 +6,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import app
+from assistant.config import LLMSettings
 from assistant.metrics import compute_metrics, normalize_priority, normalize_status
 
 client = TestClient(app)
@@ -292,3 +294,41 @@ def test_stream_emits_ordered_events(monkeypatch):
 
     report_id = body.rsplit('"id": "', 1)[1].split('"')[0]
     client.delete(f"/api/reports/{report_id}")
+
+
+# ------------------------------------------------------------------ 网络
+
+def test_local_model_endpoints_bypass_system_proxy():
+    """本机与内网模型服务不能被系统代理劫持。
+
+    Windows 上 httpx 会读取注册表里的代理设置，而它的 no_proxy 匹配不认识
+    ProxyOverride 里的 `127.*` 通配，本机请求因此被送给代理，
+    拿回一个空 body 的 502，界面只看到「模型服务返回错误。（502）」。
+    """
+    from assistant.llm import _client, _host_bypasses_proxy
+
+    assert _host_bypasses_proxy("127.0.0.1") is True
+    assert _host_bypasses_proxy("localhost") is True
+    assert _host_bypasses_proxy("::1") is True
+    assert _host_bypasses_proxy("192.168.1.20") is True
+    assert _host_bypasses_proxy("ollama.local") is True
+    assert _host_bypasses_proxy("api.deepseek.com") is False
+    assert _host_bypasses_proxy(None) is False
+
+    def settings_for(base_url: str) -> LLMSettings:
+        return LLMSettings(
+            api_key="test-key",
+            base_url=base_url,
+            model="test-model",
+            temperature=0.2,
+            timeout=5.0,
+            max_retries=0,
+        )
+
+    async def check() -> None:
+        async with _client(settings_for("http://127.0.0.1:8011")) as local:
+            assert local.trust_env is False
+        async with _client(settings_for("https://api.deepseek.com")) as remote:
+            assert remote.trust_env is True
+
+    asyncio.run(check())

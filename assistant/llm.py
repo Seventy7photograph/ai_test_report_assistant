@@ -7,9 +7,11 @@ Moonshot、SiliconFlow 等兼容服务都可以直接换 base_url 使用。
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import time
 from typing import Any, AsyncIterator
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import HTTPException
@@ -60,9 +62,39 @@ def _http_error(exc: httpx.HTTPStatusError) -> HTTPException:
         403: "该 Key 无权访问此模型。",
         404: "接口地址或模型名不正确，请检查 LLM_BASE_URL 与 LLM_MODEL。",
         429: "请求过于频繁，已被服务方限流。",
+        502: "模型服务或网络中间层返回了错误，请检查网络与系统代理设置。",
+        503: "模型服务暂时不可用。",
+        504: "模型服务网关超时。",
     }
     hint = hints.get(status, "模型服务返回错误。")
     return HTTPException(status_code=502, detail=f"{hint}（{status}）{body}")
+
+
+def _host_bypasses_proxy(host: str | None) -> bool:
+    """本机与内网地址一律绕开系统代理。
+
+    Windows 上 httpx 会读取注册表里的代理设置（Clash 一类工具常写进去），
+    而它的 no_proxy 匹配并不认识 ProxyOverride 里的 `127.*` 通配，
+    于是连 http://127.0.0.1:8011 这种本机请求也会被送给代理，
+    代理回一个空 body 的 502 —— 界面只能看到「模型服务返回错误。（502）」。
+    系统代理是给公网用的，内网直连才是正确行为。
+    """
+    if not host:
+        return False
+    if host == "localhost" or host.endswith(".local"):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address.is_private or address.is_loopback or address.is_link_local
+
+
+def _client(settings: LLMSettings, timeout: float | None = None) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=settings.timeout if timeout is None else timeout,
+        trust_env=not _host_bypasses_proxy(urlparse(settings.base_url).hostname),
+    )
 
 
 async def _request_with_retry(
@@ -75,7 +107,7 @@ async def _request_with_retry(
 
     for attempt in range(attempts):
         try:
-            async with httpx.AsyncClient(timeout=settings.timeout) as client:
+            async with _client(settings) as client:
                 response = await client.post(
                     _endpoint(settings),
                     headers=_headers(settings),
@@ -147,7 +179,7 @@ async def stream(user_prompt: str, settings: LLMSettings) -> AsyncIterator[str]:
     for attempt in range(attempts):
         emitted = False
         try:
-            async with httpx.AsyncClient(timeout=settings.timeout) as client:
+            async with _client(settings) as client:
                 async with client.stream(
                     "POST",
                     _endpoint(settings),
@@ -197,7 +229,7 @@ async def probe(settings: LLMSettings) -> tuple[int, str]:
 
     _require_key(settings)
     started = time.perf_counter()
-    async with httpx.AsyncClient(timeout=min(settings.timeout, 30.0)) as client:
+    async with _client(settings, min(settings.timeout, 30.0)) as client:
         try:
             response = await client.post(
                 _endpoint(settings),
