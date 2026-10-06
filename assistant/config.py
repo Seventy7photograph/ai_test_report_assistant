@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -48,6 +49,43 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def saved_overrides() -> dict[str, Any]:
+    """界面保存的覆盖项。
+
+    延迟导入 store：store 需要 config 的路径解析，导入期不能反向依赖。
+    存档坏掉时回落到 .env，而不是让整个服务起不来。
+    """
+
+    try:
+        from . import store
+
+        return store.load_settings()
+    except Exception:
+        return {}
+
+
+def env_defaults() -> dict[str, Any]:
+    """后端 .env 提供的默认值，也是界面「留空即回落」的目标。"""
+
+    return {
+        "api_key": os.getenv("LLM_API_KEY", "").strip(),
+        "base_url": os.getenv("LLM_BASE_URL", "https://api.deepseek.com").strip().rstrip("/")
+        or "https://api.deepseek.com",
+        "model": os.getenv("LLM_MODEL", "deepseek-chat").strip() or "deepseek-chat",
+        "models": [item.strip() for item in os.getenv("LLM_MODELS", "").split(",") if item.strip()],
+        "temperature": 0.2,
+        "timeout": _env_float("LLM_TIMEOUT", 120.0),
+        "max_retries": max(0, _env_int("LLM_MAX_RETRIES", 2)),
+    }
+
+
+def _pick(saved: dict[str, Any], key: str, fallback: Any) -> Any:
+    value = saved.get(key)
+    if value is None or value == "" or value == []:
+        return fallback
+    return value
+
+
 @dataclass(frozen=True)
 class LLMSettings:
     api_key: str
@@ -70,23 +108,54 @@ class LLMSettings:
 
 
 def llm_settings(model: str | None = None, temperature: float | None = None) -> LLMSettings:
-    base = os.getenv("LLM_BASE_URL", "https://api.deepseek.com").strip().rstrip("/")
-    chosen = (model or os.getenv("LLM_MODEL", "deepseek-chat")).strip() or "deepseek-chat"
+    """生效配置：界面保存的覆盖项优先，缺失项回落 .env。
+
+    两条路并存 —— 从没保存过任何配置时，行为与「只有 .env」完全一致。
+    """
+
+    saved = saved_overrides()
+    defaults = env_defaults()
+
+    base = str(_pick(saved, "base_url", defaults["base_url"])).strip().rstrip("/")
+    default_model = str(_pick(saved, "model", defaults["model"])).strip() or "deepseek-chat"
+    chosen = (model or default_model).strip() or "deepseek-chat"
+
+    if temperature is not None:
+        resolved_temperature = temperature
+    else:
+        try:
+            resolved_temperature = float(_pick(saved, "temperature", defaults["temperature"]))
+        except (TypeError, ValueError):
+            resolved_temperature = float(defaults["temperature"])
+
+    try:
+        timeout = float(_pick(saved, "timeout", defaults["timeout"]))
+    except (TypeError, ValueError):
+        timeout = float(defaults["timeout"])
+
+    try:
+        retries = max(0, int(_pick(saved, "max_retries", defaults["max_retries"])))
+    except (TypeError, ValueError):
+        retries = int(defaults["max_retries"])
+
     return LLMSettings(
-        api_key=os.getenv("LLM_API_KEY", "").strip(),
+        api_key=str(_pick(saved, "api_key", defaults["api_key"])).strip(),
         base_url=base or "https://api.deepseek.com",
         model=chosen,
-        temperature=0.2 if temperature is None else temperature,
-        timeout=_env_float("LLM_TIMEOUT", 120.0),
-        max_retries=max(0, _env_int("LLM_MAX_RETRIES", 2)),
+        temperature=resolved_temperature,
+        timeout=timeout,
+        max_retries=retries,
     )
 
 
 def available_models() -> list[str]:
-    """可选模型列表：来自 .env，逗号分隔。首个为默认。"""
-    raw = os.getenv("LLM_MODELS", "").strip()
-    models = [item.strip() for item in raw.split(",") if item.strip()]
-    default = os.getenv("LLM_MODEL", "deepseek-chat").strip() or "deepseek-chat"
+    """可选模型列表：界面保存的优先，否则用 .env 的 LLM_MODELS。首个为默认。"""
+
+    saved = saved_overrides()
+    defaults = env_defaults()
+    raw = _pick(saved, "models", defaults["models"])
+    models = [str(item).strip() for item in raw if str(item).strip()] if isinstance(raw, list) else []
+    default = str(_pick(saved, "model", defaults["model"])).strip() or "deepseek-chat"
     if default not in models:
         models.insert(0, default)
     return models

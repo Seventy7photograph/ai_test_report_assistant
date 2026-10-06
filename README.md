@@ -18,8 +18,8 @@
 - AI 撰写：测试总结、风险分析、缺陷归纳、下一步建议
 - 流式输出：SSE 逐字返回，报告边生成边读
 - 报告存档：历史列表、趋势曲线（含 95% 门限）、任意两轮对比
-- 报告导出：Markdown / HTML / DOCX
-- 模型设置：服务商探测、模型切换、连通性自测
+- 报告导出：界面提供 Markdown / HTML / DOCX，API 另可导出 JSON
+- 模型设置：在界面里改接口地址 / 模型 / Key 并保存，后端 `.env` 始终作为默认值；含服务商探测与真实连通性自测
 - 多模型：任何 OpenAI Chat Completions 兼容接口
 
 ## 3. 界面
@@ -29,7 +29,7 @@
 | `/` | 工作台 | 左侧送检区（数据、指令、模型），右侧读数区与生成报告 |
 | `/archive` | 存档 | 趋势曲线、筛选、历史表格、两轮对比 |
 | `/reports/:id` | 报告详情 | 结论印章、检验项目表、缺陷表、报告正文、导出 |
-| `/settings` | 设置 | 服务状态、模型列表、连通性自测 |
+| `/settings` | 设置 | 模型配置（可改可存可回退）、服务状态、连通性自测、示例数据 |
 
 视觉上是一块**计量仪器读数面板**：石墨外壳、纸白面板、发丝分隔线、唯一强调色（青），零阴影。签名动效为"定值"——生成前读数是未定的虚线青色，生成完成后锁定为墨色、基线自左向右画出、结论印章压印。
 
@@ -65,6 +65,14 @@ uvicorn app:app --reload
 
 打开 `http://127.0.0.1:8000`。后端会自动托管构建产物；未构建时会显示构建指引页面。
 
+也可以直接用项目脚本启动。它会先清理残留的 uvicorn 进程再拉起服务，避免端口被孤儿进程占住：
+
+```powershell
+pwsh scripts/dev.ps1                 # 默认 127.0.0.1:8000，带 --reload
+pwsh scripts/dev.ps1 -Port 8001      # 换端口
+pwsh scripts/dev.ps1 -NoReload       # 关掉热重载
+```
+
 ### 开发式（前端热更新）
 
 ```bash
@@ -73,6 +81,10 @@ cd frontend && npm run dev      # 终端 2，前端 5173，代理 /api 到 8000
 ```
 
 ## 6. 配置
+
+`.env` 是**默认值**，也是回退目标；界面里保存的配置优先于它，且存在本地 SQLite 里，
+不写回 `.env`。从没在界面保存过时，行为与「只有 `.env`」完全一致。
+某一项在界面留空并保存 = 删除该项的界面值，重新回落到 `.env`；点「恢复后端默认」则整体回退。
 
 全部通过环境变量（`.env`）配置：
 
@@ -97,11 +109,15 @@ cd frontend && npm run dev      # 终端 2，前端 5173，代理 /api 到 8000
 | `POST` | `/api/metrics` | 只算指标，不调模型 |
 | `POST` | `/api/analyze` | 指标 + AI 报告（一次性返回） |
 | `POST` | `/api/analyze/stream` | 同上，SSE 流式 |
+| `GET` | `/api/settings` | 当前生效的模型配置（含每项来源、Key 掩码） |
+| `PUT` | `/api/settings` | 保存界面配置；字段留空即回落 `.env` |
+| `DELETE` | `/api/settings` | 清空界面配置，全部回到 `.env` 默认 |
+| `POST` | `/api/settings/test` | 用未保存的表单值探活一次 |
 | `GET` | `/api/reports` | 历史报告列表 |
 | `GET` | `/api/trends` | 趋势数据点 |
 | `GET` | `/api/reports/{id}` | 报告详情 |
 | `DELETE` | `/api/reports/{id}` | 删除报告 |
-| `GET` | `/api/reports/{id}/export?format=md\|html\|docx` | 导出 |
+| `GET` | `/api/reports/{id}/export?format=md\|html\|docx\|json` | 导出 |
 
 交互式文档：`http://127.0.0.1:8000/docs`
 
@@ -146,11 +162,12 @@ assistant/
   store.py                 SQLite 存档：写入、列表、详情、趋势
   exporters.py             Markdown / HTML / DOCX 导出
   samples.py               4 套示例数据集
-  routers/                 system / analyze / reports 三组接口
+  routers/                 system / analyze / reports / settings 四组接口
 frontend/                  Vue 3 + TS + Vite + Element Plus
-tests/test_app.py          22 项接口与指标测试
+tests/test_app.py          34 项接口、指标与配置测试
 scripts/mock_llm.py        本地假模型服务（离线跑通全流程）
 scripts/seed_demo.py       演示数据播种（--reset 清空重建）
+scripts/dev.ps1            启动后端并清理残留 uvicorn 进程
 ```
 
 ## 9. 离线演示
@@ -176,3 +193,25 @@ python scripts/seed_demo.py --reset
 pytest tests              # 后端
 cd frontend && npm run typecheck && npm run build   # 前端类型检查与构建
 ```
+
+## 11. 排障
+
+**`ERROR: [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。`**
+
+端口已经被占用，最常见的是上一次 `uvicorn --reload` 留下的孤儿工作进程。
+`--reload` 会派生一个 multiprocessing 子进程，真正持有套接字的是它；父进程被强杀后，
+子进程还在监听，而且命令行里不含 `uvicorn`，用 `tasklist` 很难认出来。此时重新启动就会失败。
+
+```powershell
+pwsh scripts/dev.ps1        # 自动清理后再启动
+```
+
+手动处理：`Get-NetTCPConnection -State Listen -LocalPort 8000 | Select OwningProcess`，
+结束对应进程后重试，或换端口 `pwsh scripts/dev.ps1 -Port 8001`。
+
+**502 / 模型服务返回错误，但接口是 200**
+
+流式接口 `/api/analyze/stream` 一旦开始响应，HTTP 状态码就已经是 200，
+后续的模型错误通过 SSE 的 `event: error` 传给前端。所以「200 + 界面报 502」是正常现象，
+要看前端提示里的具体原因。本机模型服务（`127.0.0.1` / 内网）被系统代理劫持是常见成因，
+`assistant/llm.py` 已对环回与内网地址强制绕过系统代理。

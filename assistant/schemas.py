@@ -177,3 +177,47 @@ class SampleDataset(BaseModel):
 class DeleteResponse(BaseModel):
     deleted: bool
     id: str
+
+
+# ------------------------------------------------------------------ 配置
+
+class LLMSettingsUpdate(BaseModel):
+    """界面提交的模型配置。整体替换：留空即回落 .env 默认。
+
+    api_key 是例外 —— 不回显给界面，所以留空表示「不改动」，
+    要清除得显式置 clear_api_key。
+    """
+
+    base_url: str | None = None
+    model: str | None = None
+    models: list[str] | None = None
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    timeout: float | None = Field(default=None, gt=0, le=600)
+    max_retries: int | None = Field(default=None, ge=0, le=10)
+    api_key: str | None = None
+    clear_api_key: bool = False
+
+
+class SettingsTestRequest(BaseModel):
+    """未保存也能先试一次：只带本次表单里改动的字段。"""
+
+    base_url: str | None = None
+    model: str | None = None
+    api_key: str | None = None
+    timeout: float | None = Field(default=None, gt=0, le=600)
+
+
+class LLMSettingsView(BaseModel):
+    """生效配置 + 每项来源。界面据此显示「界面保存」还是「.env 默认」。"""
+
+    base_url: str
+    model: str
+    models: list[str] = Field(default_factory=list)
+    temperature: float
+    timeout: float
+    max_retries: int
+    api_key_set: bool
+    api_key_masked: str | None = None
+    api_key_stored: bool = False
+    sources: dict[str, str] = Field(default_factory=dict)
+    env: dict[str, Any] = Field(default_factory=dict)

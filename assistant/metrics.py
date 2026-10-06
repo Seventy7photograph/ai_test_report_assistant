@@ -31,6 +31,7 @@ _DEFECT_STATUS_KEYS = ("status", "state", "状态")
 _PRIORITY_ORDER = ["P0", "P1", "P2", "P3"]
 _PRIORITY_LABELS = {"P0": "P0 阻断", "P1": "P1 严重", "P2": "P2 一般", "P3": "P3 轻微"}
 _STATUS_LABELS = {"open": "未关闭", "resolved": "已修复", "rejected": "已驳回"}
+_STATUS_LABELS["unknown"] = "状态未标注"
 
 _OPEN_MARKERS = (
     "待修复", "未修复", "未关闭", "重新打开", "新建", "处理中", "进行中", "遗留", "待处理",
@@ -41,6 +42,14 @@ _RESOLVED_MARKERS = (
     "resolved", "fixed", "closed", "done", "verified", "complete",
 )
 _REJECTED_MARKERS = ("驳回", "不接受", "非缺陷", "rejected", "wontfix", "won't fix", "invalid", "duplicate")
+
+# 否定式必须排在肯定式前面：unresolved 里含 resolved、not fixed 里含 fixed、
+# 未完成里含完成。顺序反了就会把「未关闭」读成「已修复」，
+# 于是 open_p0 归零，发版闸门被直接放行。
+_NEGATED_OPEN_MARKERS = (
+    "unresolved", "not resolved", "not fixed", "unfixed", "not closed", "not done",
+    "incomplete", "未解决", "未修复", "未关闭", "未完成", "没修复", "尚未修复",
+)
 
 _EXCERPT_LIMIT = 160
 
@@ -108,6 +117,8 @@ def normalize_status(value: Any) -> str | None:
     if not text:
         return None
     lower = text.lower()
+    if any(marker in lower for marker in _NEGATED_OPEN_MARKERS):
+        return "open"
     if any(marker in lower for marker in _REJECTED_MARKERS):
         return "rejected"
     if any(marker in lower for marker in _OPEN_MARKERS):
@@ -152,18 +163,24 @@ def parse_payload(raw: str) -> tuple[Any | None, list[str]]:
     return None, ["输入不是可解析的 JSON，无法计算指标；报告仍会基于原文生成。"]
 
 
-def _walk(obj: Any, depth: int = 0) -> Iterator[Any]:
-    yield obj
+def _walk(obj: Any, depth: int = 0, key: str | None = None) -> Iterator[tuple[str | None, Any]]:
+    """遍历嵌套结构，并带上每一层的键名。
+
+    键名是最强的语义信号：cases / 用例 下面的列表是用例，
+    defects / 缺陷 下面的才是缺陷。只看元素长什么样，这两者分不开。
+    """
+
+    yield key, obj
     if depth >= 3:
         return
     if isinstance(obj, dict):
-        for value in obj.values():
+        for name, value in obj.items():
             if isinstance(value, (dict, list)):
-                yield from _walk(value, depth + 1)
+                yield from _walk(value, depth + 1, str(name))
     elif isinstance(obj, list):
         for value in obj[:5]:
             if isinstance(value, (dict, list)):
-                yield from _walk(value, depth + 1)
+                yield from _walk(value, depth + 1, key)
 
 
 _COUNT_GROUPS = (_TOTAL_KEYS, _PASSED_KEYS, _FAILED_KEYS, _BLOCKED_KEYS, _SKIPPED_KEYS)
@@ -179,7 +196,7 @@ def find_count_container(parsed: Any) -> dict[str, Any] | None:
 
     best: dict[str, Any] | None = None
     best_score = 0
-    for node in _walk(parsed):
+    for _key, node in _walk(parsed):
         if not isinstance(node, dict):
             continue
         score = _count_score(node)
@@ -188,25 +205,73 @@ def find_count_container(parsed: Any) -> dict[str, Any] | None:
     return best if best_score >= 2 else None
 
 
+_DEFECT_CONTAINER_KEYS = (
+    "defect", "defects", "bug", "bugs", "issue", "issues", "缺陷", "问题", "bug_list", "defect_list",
+)
+_CASE_CONTAINER_KEYS = (
+    "case", "cases", "testcase", "testcases", "test_case", "test_cases", "tests", "用例", "测试用例",
+)
+_TESTCASE_ITEM_KEYS = (
+    "steps", "step", "expected", "actual", "precondition", "case_id", "testcase", "test_case",
+    "用例", "步骤", "预期", "实际", "前置条件",
+)
+_CASE_ID_RE = re.compile(r"^\s*(tc|case|t)[-_ ]?\d", re.IGNORECASE)
+
+
+def _matches_vocabulary(key: str | None, vocabulary: tuple[str, ...]) -> bool:
+    if not key:
+        return False
+    lowered = key.lower()
+    return any(word in lowered for word in vocabulary)
+
+
+def _defect_score(items: list[dict[str, Any]]) -> int:
+    """给一份列表打分，判断它像不像缺陷清单。
+
+    只看元素字段是不够的 —— 用例清单同样有 id / title / status。
+    所以优先级/严重程度权重最高，用例特征字段直接判负。
+    """
+
+    keys = {str(k).lower() for k in items[0]}
+    if keys & {k.lower() for k in _TESTCASE_ITEM_KEYS}:
+        return 0
+
+    score = 0
+    if keys & {k.lower() for k in _DEFECT_PRIORITY_KEYS}:
+        score += 3
+    if keys & {k.lower() for k in _DEFECT_STATUS_KEYS}:
+        score += 1
+    if keys & {k.lower() for k in _DEFECT_ID_KEYS}:
+        score += 1
+    if keys & {k.lower() for k in _DEFECT_TITLE_KEYS}:
+        score += 1
+
+    first_id = _as_text(_lookup(items[0], _DEFECT_ID_KEYS)) or ""
+    if _CASE_ID_RE.match(first_id):
+        score -= 2
+    return score
+
+
 def find_defects(parsed: Any) -> list[dict[str, Any]]:
     """找到缺陷清单：一份由字典组成、且字段像缺陷的列表。"""
 
     best: list[dict[str, Any]] = []
-    for node in _walk(parsed):
+    best_score = 0
+    for key, node in _walk(parsed):
         if not isinstance(node, list):
             continue
         items = [item for item in node if isinstance(item, dict)]
         if not items:
             continue
-        sample = items[0]
-        keys = {str(k).lower() for k in sample}
-        looks_like_defect = bool(
-            keys & {k.lower() for k in _DEFECT_PRIORITY_KEYS}
-            or keys & {k.lower() for k in _DEFECT_STATUS_KEYS}
-            or keys & {k.lower() for k in _DEFECT_ID_KEYS}
-        )
-        if looks_like_defect and len(items) > len(best):
-            best = items
+
+        score = _defect_score(items)
+        if _matches_vocabulary(key, _DEFECT_CONTAINER_KEYS):
+            score += 2
+        elif _matches_vocabulary(key, _CASE_CONTAINER_KEYS):
+            score = 0
+
+        if score >= 3 and (score > best_score or (score == best_score and len(items) > len(best))):
+            best, best_score = items, score
     return best
 
 
@@ -260,6 +325,8 @@ def _decide_verdict(
     reasons.append(f"通过率 {pass_rate * 100:.1f}%，失败率 {fail_rate * 100:.1f}%")
     if defects_known and defects_open == 0:
         reasons.append("无未关闭缺陷")
+    elif defects_open:
+        reasons.append(f"仍有 {defects_open} 条未关闭缺陷，但均低于 P1")
     if skipped:
         reasons.append(f"另有 {skipped} 条用例未执行，结论未覆盖该部分")
     return "pass", "建议发版", reasons
@@ -284,6 +351,20 @@ def compute_metrics(raw: str) -> MetricsResult:
     container = find_count_container(parsed)
     raw_defects = find_defects(parsed)
     defects = [_to_defect(item) for item in raw_defects]
+    deduped: list[Defect] = []
+    seen_ids: set[str] = set()
+    for defect in defects:
+        marker = (defect.id or "").strip().lower()
+        if marker:
+            if marker in seen_ids:
+                continue
+            seen_ids.add(marker)
+        deduped.append(defect)
+    if len(deduped) != len(defects):
+        result.warnings.append(
+            f"缺陷清单里有 {len(defects) - len(deduped)} 条重复编号，已去重后统计。"
+        )
+    defects = deduped
     result.defects = defects
 
     if container is None:
@@ -295,6 +376,21 @@ def compute_metrics(raw: str) -> MetricsResult:
     failed = _lookup_int(container, _FAILED_KEYS)
     blocked = _lookup_int(container, _BLOCKED_KEYS) or 0
     skipped = _lookup_int(container, _SKIPPED_KEYS) or 0
+
+    negative = [
+        name
+        for name, value in (
+            ("总数", total), ("通过", passed), ("失败", failed), ("阻塞", blocked), ("未执行", skipped),
+        )
+        if value is not None and value < 0
+    ]
+    if negative:
+        result.warnings.append(f"用例计数里出现负数（{'、'.join(negative)}），已按 0 处理。")
+        total = None if total is None else max(total, 0)
+        passed = None if passed is None else max(passed, 0)
+        failed = None if failed is None else max(failed, 0)
+        blocked = max(blocked, 0)
+        skipped = max(skipped, 0)
 
     known = [v for v in (passed, failed) if v is not None]
     if total is None:
@@ -329,19 +425,28 @@ def compute_metrics(raw: str) -> MetricsResult:
     open_p0 = open_p1 = 0
     defects_open = 0
 
+    unlabeled_status = 0
     for defect in defects:
         priority = defect.priority or "未标注"
-        status = defect.status or "未标注"
+        status = defect.status or "unknown"
         by_priority[priority] = by_priority.get(priority, 0) + 1
         by_status[status] = by_status.get(status, 0) + 1
         if defect.module:
             by_module[defect.module] = by_module.get(defect.module, 0) + 1
-        if status == "open":
+        # 状态读不出来时按未关闭处理：闸门宁可拦错，也不能把没读到的缺陷放行。
+        if status in ("open", "unknown"):
             defects_open += 1
+            if status == "unknown":
+                unlabeled_status += 1
             if priority == "P0":
                 open_p0 += 1
             elif priority == "P1":
                 open_p1 += 1
+
+    if unlabeled_status:
+        result.warnings.append(
+            f"{unlabeled_status} 条缺陷没有可识别的状态，已按未关闭计入判定。"
+        )
 
     def _ordered(counts: dict[str, int], order: list[str] | None, labeler) -> list[CountItem]:
         keys = list(counts)
@@ -377,7 +482,7 @@ def compute_metrics(raw: str) -> MetricsResult:
         open_p0=open_p0,
         open_p1=open_p1,
         by_priority=_ordered(by_priority, _PRIORITY_ORDER, _priority_label),
-        by_status=_ordered(by_status, ["open", "resolved", "rejected"], _status_label),
+        by_status=_ordered(by_status, ["open", "unknown", "resolved", "rejected"], _status_label),
         by_module=_ordered(by_module, None, lambda k: k)[:6],
         verdict=verdict,  # type: ignore[arg-type]
         verdict_label=verdict_label,

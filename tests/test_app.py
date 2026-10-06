@@ -332,3 +332,231 @@ def test_local_model_endpoints_bypass_system_proxy():
             assert remote.trust_env is True
 
     asyncio.run(check())
+
+
+def test_settings_follow_env_then_saved_then_reset(monkeypatch):
+    """三种状态：只有 .env → 界面保存 → 恢复默认。"""
+    monkeypatch.setenv("LLM_API_KEY", "env-key")
+    monkeypatch.setenv("LLM_MODEL", "env-model")
+    monkeypatch.setenv("LLM_BASE_URL", "https://env.example")
+    client.delete("/api/settings")
+
+    view = client.get("/api/settings").json()
+    assert view["model"] == "env-model"
+    assert view["base_url"] == "https://env.example"
+    assert view["sources"]["model"] == "env"
+    assert view["api_key_masked"] is None
+    assert view["env"]["api_key_set"] is True
+    assert "api_key" not in view["env"]  # 不回显明文 Key
+
+    saved = client.put(
+        "/api/settings",
+        json={
+            "base_url": "https://saved.example/v1/",
+            "model": "saved-model",
+            "models": ["saved-model", "other"],
+            "temperature": 0.5,
+            "timeout": 30,
+            "max_retries": 1,
+            "api_key": "sk-abcdefgh1234",
+        },
+    ).json()
+    assert saved["base_url"] == "https://saved.example/v1"  # 末尾斜杠归一化
+    assert saved["sources"]["model"] == "saved"
+    assert saved["api_key_stored"] is True
+    assert saved["api_key_masked"].endswith("1234")
+    assert "abcdefgh" not in saved["api_key_masked"]
+
+    assert client.get("/api/system/status").json()["model"] == "saved-model"
+
+    reset = client.delete("/api/settings").json()
+    assert reset["model"] == "env-model"
+    assert reset["api_key_stored"] is False
+    assert reset["sources"]["api_key"] == "env"
+
+
+def test_settings_partial_update_keeps_key_and_supports_clear(monkeypatch):
+    """改模型不能顺手把 Key 清掉；要清除必须显式。"""
+    monkeypatch.setenv("LLM_API_KEY", "env-key")
+    client.delete("/api/settings")
+
+    client.put("/api/settings", json={"model": "m1", "api_key": "sk-first-9876"})
+    assert client.get("/api/settings").json()["api_key_stored"] is True
+
+    client.put("/api/settings", json={"model": "m2"})
+    view = client.get("/api/settings").json()
+    assert view["model"] == "m2"
+    assert view["api_key_stored"] is True
+
+    cleared = client.put("/api/settings", json={"clear_api_key": True}).json()
+    assert cleared["api_key_stored"] is False
+    assert cleared["api_key_set"] is True  # 回落到 .env 的 Key
+    client.delete("/api/settings")
+
+
+def test_settings_blank_field_falls_back_to_env(monkeypatch):
+    """界面留空 = 该项回落 .env，而不是写进去一个空值。"""
+    monkeypatch.setenv("LLM_MODEL", "env-model")
+    monkeypatch.setenv("LLM_TIMEOUT", "77")
+    client.delete("/api/settings")
+
+    client.put("/api/settings", json={"model": "saved-model", "timeout": 12})
+    assert client.get("/api/settings").json()["timeout"] == 12
+
+    view = client.put("/api/settings", json={"model": "", "timeout": None}).json()
+    assert view["model"] == "env-model"
+    assert view["sources"]["model"] == "env"
+    assert view["timeout"] == 77.0
+    assert view["sources"]["timeout"] == "env"
+    client.delete("/api/settings")
+
+
+def test_analyze_uses_saved_settings(monkeypatch):
+    """界面保存的配置要真的作用到调用上，而不是只改显示。"""
+    monkeypatch.setenv("LLM_MODEL", "env-model")
+    seen: dict[str, object] = {}
+
+    async def fake_complete(prompt: str, settings):
+        seen["model"] = settings.model
+        seen["base_url"] = settings.base_url
+        seen["temperature"] = settings.temperature
+        return "## 测试概况\n接口可用。", None
+
+    monkeypatch.setattr("assistant.routers.analyze.complete", fake_complete)
+
+    try:
+        client.put(
+            "/api/settings",
+            json={"model": "ui-model", "base_url": "https://ui.example/v1", "temperature": 0.9},
+        )
+        response = client.post(
+            "/api/analyze",
+            json={"test_data": '{"total_cases": 1, "passed": 1}', "save": False},
+        )
+        assert response.status_code == 200
+        assert seen["model"] == "ui-model"
+        assert seen["base_url"] == "https://ui.example/v1"
+        assert seen["temperature"] == 0.9
+    finally:
+        client.delete("/api/settings")
+
+
+# ------------------------------------------------------------------ 指标回归
+
+def test_negated_statuses_count_as_open():
+    """unresolved / not fixed / 未解决 这些否定式曾经被读成「已修复」，
+    导致 open_p0 归零、发版闸门被放行。"""
+    for label in ("unresolved", "not resolved", "not fixed", "unfixed", "未解决", "没修复", "尚未修复"):
+        assert normalize_status(label) == "open", label
+    # 肯定式仍然正确
+    assert normalize_status("resolved") == "resolved"
+    assert normalize_status("fixed") == "resolved"
+    assert normalize_status("已关闭") == "resolved"
+
+    payload = {
+        "total_cases": 10,
+        "passed": 10,
+        "defects": [{"id": "BUG-1", "priority": "P0", "status": "unresolved"}],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.open_p0 == 1
+    assert result.metrics.verdict == "reject"
+
+
+def test_test_case_list_is_not_mistaken_for_defects():
+    """用例清单同样有 id / status，不能被当成 40 条缺陷。"""
+    payload = {
+        "total_cases": 40,
+        "passed": 40,
+        "cases": [
+            {"case_id": f"TC-{i}", "title": f"用例 {i}", "status": "passed", "steps": ["a", "b"]}
+            for i in range(40)
+        ],
+        "defects": [],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.defects_total == 0
+    assert result.metrics.verdict == "pass"
+
+
+def test_duplicate_defect_ids_are_deduped():
+    payload = {
+        "total_cases": 10,
+        "passed": 9,
+        "failed": 1,
+        "defects": [
+            {"id": "BUG-1", "priority": "P1", "status": "open"},
+            {"id": "bug-1", "priority": "P1", "status": "open"},
+            {"id": "BUG-2", "priority": "P2", "status": "open"},
+        ],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.defects_total == 2
+    assert any("重复" in warning for warning in result.warnings)
+
+
+def test_missing_defect_status_counts_as_open():
+    """状态缺失时按未关闭处理：宁可拦错，也不放行没读到的缺陷。"""
+    payload = {
+        "total_cases": 10,
+        "passed": 10,
+        "defects": [{"id": "B1", "priority": "P0"}],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.defects_open == 1
+    assert result.metrics.verdict == "reject"
+    assert any("状态" in warning for warning in result.warnings)
+
+
+def test_negative_case_counts_are_clamped():
+    """负数计数曾经能算出 60% 通过率这种鬼话，现在按 0 处理并告警。"""
+    payload = {"total_cases": -5, "passed": -3, "failed": -2}
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.total == 0
+    assert result.metrics.passed == 0
+    assert any("负数" in warning for warning in result.warnings)
+
+
+def test_pass_reason_mentions_open_defects():
+    payload = {
+        "total_cases": 100,
+        "passed": 100,
+        "defects": [{"id": "B1", "priority": "P2", "status": "open"}],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.verdict == "pass"
+    assert any("未关闭缺陷" in reason for reason in result.metrics.verdict_reasons)
+
+
+def test_html_export_neutralises_injected_scripts_and_urls():
+    """导出的 HTML 同源打开，正文里的脚本/危险链接不能可执行。"""
+    import re as _re
+
+    from assistant.exporters import to_html
+
+    record = {
+        "title": "<script>alert('t')</script>报告",
+        "model": "m<script>alert('m')</script>",
+        "report": (
+            "正常正文\n\n"
+            "<script>alert('xss')</script>\n\n"
+            "<img src=x onerror=alert(1)>\n\n"
+            "[链接](javascript:alert(2))\n\n"
+            "[另一条](VBScript:msgbox)\n\n"
+            "自动链接 <https://example.com>\n\n"
+            "> 引用"
+        ),
+    }
+    out = to_html(record)
+    assert "<script" not in out
+    assert _re.search(r"<[^>]*onerror", out) is None
+    assert "javascript:" not in out.lower()
+    assert "vbscript:" not in out.lower()
+    assert 'href="https://example.com"' in out
+    assert "&lt;script&gt;" in out

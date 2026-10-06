@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from assistant import store
 from assistant.config import APP_NAME, APP_VERSION, legacy_static_dir, spa_dir
-from assistant.routers import analyze, reports, system
+from assistant.routers import analyze, reports, settings, system
 
 # Windows 注册表常把 .js 登记成 text/plain，会让 <script type="module"> 被浏览器拒绝。
 # 这里显式声明前端产物的类型，避免依赖宿主机的 mimetypes 配置。
@@ -81,6 +81,7 @@ store.init_db()  # 保证不依赖 lifespan 的调用方（例如 TestClient）�
 app.include_router(system.router)
 app.include_router(analyze.router)
 app.include_router(reports.router)
+app.include_router(settings.router)
 
 
 @app.get("/health", tags=["system"])

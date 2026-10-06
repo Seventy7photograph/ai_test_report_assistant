@@ -61,4 +61,25 @@ defineProps<{ rows: { label: string; value: string; note?: string }[] }>()
   color: var(--ink-3);
   white-space: nowrap;
 }
+
+/* 窄屏下值列会被长 URL 挤到逐字换行，改成上下堆叠。 */
+@media (max-width: 560px) {
+  .spec__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .spec__row dd {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    width: 100%;
+    text-align: left;
+  }
+
+  .spec__note {
+    white-space: normal;
+  }
+}
 </style>

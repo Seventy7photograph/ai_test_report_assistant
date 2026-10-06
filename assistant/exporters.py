@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+import html
 import re
 from typing import Any
 
@@ -175,15 +176,51 @@ def to_markdown(record: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _escape_inline_html(markdown_text: str) -> str:
+    """把 Markdown 里夹带的裸 HTML 关掉，再交给渲染器。
+
+    报告正文来自模型，而模型看的是用户粘贴的内容 —— 原样导出等于让人
+    双击一个可执行脚本的 HTML。这里转义 & 与 <，只放行自动链接 `<https://…>`；
+    Markdown 自身的语法（含 `>` 引用）不受影响。
+    """
+
+    escaped = markdown_text.replace("&", "&amp;")
+    return re.sub(r"<(?!https?://|mailto:)", "&lt;", escaped)
+
+
+_UNSAFE_URL_SCHEME = re.compile(
+    r"""(?P<head>\b(?:href|src)\s*=\s*(?P<quote>["']))"""
+    r"""(?P<scheme>\s*(?:javascript|vbscript|data)\s*:)""",
+    re.IGNORECASE,
+)
+
+
+def _neutralize_unsafe_urls(html_text: str) -> str:
+    """干掉渲染结果里的可执行 URL scheme。
+
+    `<` 已经被转义，所以正文里写不出裸标签；但 Markdown 的链接语法会由
+    渲染器自己生成 `<a href="…">`，而 `[x](javascript:alert(1))` 是合法
+    Markdown。导出文件是同源打开，这种链接点一下就能执行脚本。
+    这里把 href/src 的取值改成空串，保留元素本身。
+    """
+
+    return _UNSAFE_URL_SCHEME.sub(
+        lambda match: f"{match.group('head')}#", html_text
+    )
+
+
 def to_html(record: dict[str, Any]) -> str:
     body_md = (record.get("report") or "").strip()
-    body_html = markdown_lib.markdown(
-        body_md, extensions=["tables", "fenced_code", "sane_lists", "nl2br"]
+    body_html = _neutralize_unsafe_urls(
+        markdown_lib.markdown(
+            _escape_inline_html(body_md),
+            extensions=["tables", "fenced_code", "sane_lists", "nl2br"],
+        )
     )
     return _HTML_TEMPLATE.format(
-        title=record.get("title") or "测试报告",
-        meta=_meta_line(record),
-        model=record.get("model") or "—",
+        title=html.escape(record.get("title") or "测试报告"),
+        meta=html.escape(_meta_line(record)),
+        model=html.escape(record.get("model") or "—"),
         body=f"{_metrics_table(record)}\n{body_html}",
     )
 

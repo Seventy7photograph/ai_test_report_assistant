@@ -3,10 +3,13 @@ import type {
   AnalyzeResponse,
   ExportFormat,
   LLMTestResult,
+  LLMSettingsUpdate,
+  LLMSettingsView,
   MetricsResult,
   ReportDetail,
   ReportListResponse,
   SampleDataset,
+  SettingsTestPayload,
   StreamHandlers,
   SystemStatus,
   TrendPoint,
@@ -56,6 +59,22 @@ export const api = {
   status: () => request<SystemStatus>('/api/system/status'),
 
   llmTest: () => request<LLMTestResult>('/api/system/llm-test', { method: 'POST' }),
+
+  settings: () => request<LLMSettingsView>('/api/settings'),
+
+  saveSettings: (payload: LLMSettingsUpdate) =>
+    request<LLMSettingsView>('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  resetSettings: () => request<LLMSettingsView>('/api/settings', { method: 'DELETE' }),
+
+  testSettings: (payload: SettingsTestPayload = {}) =>
+    request<LLMTestResult>('/api/settings/test', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   samples: () => request<SampleDataset[]>('/api/samples'),
 
@@ -125,6 +144,9 @@ export async function streamAnalyze(
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  // 只有收到 done / error 才算这一轮有结论。连接被网关掐断时流会干净地
+  // 结束（EOF），不打这两个标记就等于把半截报告当完整报告显示。
+  let settled = false
 
   const dispatch = (event: string, data: string) => {
     if (!data) return
@@ -145,9 +167,11 @@ export async function streamAnalyze(
         handlers.onDelta?.((parsed as { text: string }).text)
         break
       case 'done':
+        settled = true
         handlers.onDone?.(parsed as Parameters<NonNullable<StreamHandlers['onDone']>>[0])
         break
       case 'error':
+        settled = true
         handlers.onError?.((parsed as { detail: string }).detail)
         break
     }
@@ -171,5 +195,20 @@ export async function streamAnalyze(
       dispatch(event, dataLines.join('\n'))
       boundary = buffer.indexOf('\n\n')
     }
+  }
+
+  // 收尾：最后一段可能没有以空行结束。
+  if (buffer.trim()) {
+    let event = 'message'
+    const dataLines: string[] = []
+    for (const line of buffer.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim()
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+    }
+    dispatch(event, dataLines.join('\n'))
+  }
+
+  if (!settled) {
+    handlers.onError?.('流式响应意外中断，当前报告可能不完整，请重试。')
   }
 }

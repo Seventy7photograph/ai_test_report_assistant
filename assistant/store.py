@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS reports (
     blocked       INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -228,3 +233,62 @@ def trend_points(limit: int = 12) -> list[dict[str, Any]]:
             }
         )
     return points
+
+
+# --------------------------------------------------------------- 运行时配置
+
+SETTINGS_KEYS = (
+    "api_key",
+    "base_url",
+    "model",
+    "models",
+    "temperature",
+    "timeout",
+    "max_retries",
+)
+
+
+def load_settings() -> dict[str, Any]:
+    """界面保存的配置覆盖项。空表 = 全部沿用 .env 默认。"""
+
+    try:
+        with _connect() as conn:
+            rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    except sqlite3.Error:
+        return {}
+
+    data: dict[str, Any] = {}
+    for row in rows:
+        try:
+            data[row["key"]] = json.loads(row["value"])
+        except json.JSONDecodeError:
+            continue
+    return data
+
+
+def save_settings(values: dict[str, Any]) -> dict[str, Any]:
+    """按出现范围写入覆盖项。
+
+    键出现但值为空 → 删除该项，回落到 .env；键没出现 → 保持不动。
+    因此「只改模型名」不会顺手把 Key 清掉。
+    """
+
+    with _connect() as conn:
+        for key, value in values.items():
+            if key not in SETTINGS_KEYS:
+                continue
+            if value is None or value == "" or value == []:
+                conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+            else:
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    (key, json.dumps(value, ensure_ascii=False)),
+                )
+    return load_settings()
+
+
+def clear_settings() -> None:
+    """全部恢复为 .env 默认。"""
+
+    with _connect() as conn:
+        conn.execute("DELETE FROM settings")

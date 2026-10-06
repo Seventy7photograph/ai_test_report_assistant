@@ -143,6 +143,46 @@ export interface LLMTestResult {
 
 export type ExportFormat = 'md' | 'html' | 'docx' | 'json'
 
+export interface LLMSettingsView {
+  base_url: string
+  model: string
+  models: string[]
+  temperature: number
+  timeout: number
+  max_retries: number
+  api_key_set: boolean
+  api_key_masked: string | null
+  api_key_stored: boolean
+  sources: Record<string, 'env' | 'saved'>
+  env: {
+    base_url?: string
+    model?: string
+    models?: string[]
+    temperature?: number
+    timeout?: number
+    max_retries?: number
+    api_key_set?: boolean
+  }
+}
+
+export interface LLMSettingsUpdate {
+  base_url?: string | null
+  model?: string | null
+  models?: string[] | null
+  temperature?: number | null
+  timeout?: number | null
+  max_retries?: number | null
+  api_key?: string | null
+  clear_api_key?: boolean
+}
+
+export interface SettingsTestPayload {
+  base_url?: string | null
+  model?: string | null
+  api_key?: string | null
+  timeout?: number | null
+}
+
 export interface StreamHandlers {
   onMeta?: (meta: { model: string; provider: string; created_at: string; version: string | null; warnings: string[] }) => void
   onMetrics?: (metrics: Metrics) => void
