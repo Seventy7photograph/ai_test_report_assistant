@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,27 @@ KNOWN_PROVIDERS = {
     "open.bigmodel.cn": "智谱 AI",
     "api.siliconflow.cn": "SiliconFlow",
 }
+
+
+def provider_label(host: str) -> str:
+    """把 base_url 的主机名翻成界面能读的服务商标签。
+
+    自建/本地部署时主机名往往就是一个 IP，直接显示 127.0.0.1 没有信息量。
+    """
+
+    if not host:
+        return "自定义"
+    if host in KNOWN_PROVIDERS:
+        return KNOWN_PROVIDERS[host]
+    if host == "localhost" or host.endswith(".local"):
+        return "本地服务"
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    if address.is_loopback or address.is_private or address.is_link_local:
+        return "本地服务"
+    return host
 
 
 def _env_float(name: str, default: float) -> float:
@@ -104,7 +126,7 @@ class LLMSettings:
         """从 base_url 推断服务商标签，仅用于界面展示。"""
         host = urlparse(self.base_url).netloc or self.base_url
         host = host.split("@")[-1].split(":")[0]
-        return KNOWN_PROVIDERS.get(host, host or "自定义")
+        return provider_label(host)
 
 
 def llm_settings(model: str | None = None, temperature: float | None = None) -> LLMSettings:

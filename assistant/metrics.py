@@ -36,10 +36,14 @@ _STATUS_LABELS["unknown"] = "状态未标注"
 _OPEN_MARKERS = (
     "待修复", "未修复", "未关闭", "重新打开", "新建", "处理中", "进行中", "遗留", "待处理",
     "open", "new", "reopen", "in progress", "in_progress", "active", "todo", "assigned", "blocked",
+    # 这些状态以前既不是 open 也不是 resolved，会被当成"读不出来"而放行。
+    "in review", "reviewing", "待复核", "待验证", "验证中", "待回归", "fixing",
+    "pending verification", "awaiting",
 )
 _RESOLVED_MARKERS = (
     "已修复", "已验证", "已关闭", "关闭", "完成", "已解决", "已验收",
     "resolved", "fixed", "closed", "done", "verified", "complete",
+    "回归通过", "验证通过", "已回归", "修复完成", "已确认修复",
 )
 _REJECTED_MARKERS = ("驳回", "不接受", "非缺陷", "rejected", "wontfix", "won't fix", "invalid", "duplicate")
 
@@ -125,7 +129,15 @@ def normalize_status(value: Any) -> str | None:
         return "open"
     if any(marker in lower for marker in _RESOLVED_MARKERS):
         return "resolved"
-    return text
+    # 认不出来的状态归入 unknown，而不是原样返回：原样返回会让它既不算
+    # open 也不算 resolved，从而被闸门当成"已关闭"放行。
+    return "unknown"
+
+
+def status_label(key: str) -> str:
+    """状态键对应的中文标签（提示词与界面共用）。"""
+
+    return _STATUS_LABELS.get(key, key)
 
 
 def _priority_label(key: str) -> str:
@@ -133,7 +145,7 @@ def _priority_label(key: str) -> str:
 
 
 def _status_label(key: str) -> str:
-    return _STATUS_LABELS.get(key, key)
+    return status_label(key)
 
 
 # --------------------------------------------------------------- 解析
@@ -354,7 +366,12 @@ def compute_metrics(raw: str) -> MetricsResult:
     deduped: list[Defect] = []
     seen_ids: set[str] = set()
     for defect in defects:
-        marker = (defect.id or "").strip().lower()
+        # 编号 + 模块才算同一条：不同模块复用「1」「2」这类编号是常见做法，
+        # 只看编号会把它们误判成重复而丢掉。
+        marker = "|".join(
+            part for part in ((defect.id or "").strip().lower(), (defect.module or "").strip().lower())
+            if part
+        )
         if marker:
             if marker in seen_ids:
                 continue
@@ -433,8 +450,9 @@ def compute_metrics(raw: str) -> MetricsResult:
         by_status[status] = by_status.get(status, 0) + 1
         if defect.module:
             by_module[defect.module] = by_module.get(defect.module, 0) + 1
-        # 状态读不出来时按未关闭处理：闸门宁可拦错，也不能把没读到的缺陷放行。
-        if status in ("open", "unknown"):
+        # 只有明确标成"已修复/已驳回"的才算关闭；其余（含读不出来的）
+        # 一律计入未关闭。闸门宁可拦错，也不能把没读到的缺陷放行。
+        if status not in ("resolved", "rejected"):
             defects_open += 1
             if status == "unknown":
                 unlabeled_status += 1

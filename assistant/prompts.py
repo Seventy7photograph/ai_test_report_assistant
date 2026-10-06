@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from .metrics import status_label
 from .schemas import Metrics, MetricsResult
+
+_DEFECT_LIST_LIMIT = 40
 
 SYSTEM_PROMPT = """你是一名企业级软件测试分析助手。
 你的任务是分析测试执行数据，输出结构化、可执行的测试报告。
@@ -51,6 +54,21 @@ def _format_metrics(result: MetricsResult) -> str:
         lines.append(
             "- 按模块：" + "、".join(f"{item.label} {item.count}" for item in metrics.by_module)
         )
+    if result.defects:
+        # 明细也放进"权威口径"：否则模型回答"哪个模块缺陷最密"时
+        # 只能自己数原始数据，容易和上面的统计对不上。
+        lines.append("- 缺陷明细（编号 | 优先级 | 模块 | 状态）：")
+        for defect in result.defects[:_DEFECT_LIST_LIMIT]:
+            status = defect.status or "unknown"
+            label = status_label(status)
+            if status == "unknown":
+                label = f"{label}（按未关闭计）"
+            lines.append(
+                f"  - {defect.id or '未编号'} | {defect.priority or '未标注'} | "
+                f"{defect.module or '未标注模块'} | {label}"
+            )
+        if len(result.defects) > _DEFECT_LIST_LIMIT:
+            lines.append(f"  - …另有 {len(result.defects) - _DEFECT_LIST_LIMIT} 条未列出，见原始数据。")
     return "\n".join(lines)
 
 

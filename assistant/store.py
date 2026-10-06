@@ -9,8 +9,9 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterator
 
 from .config import db_path
 from .metrics import excerpt
@@ -55,8 +56,24 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+@contextmanager
+def _session() -> Iterator[sqlite3.Connection]:
+    """一个连接 = 一个事务，结束时提交并**关闭**。
+
+    `with sqlite3.connect(...)` 只管事务、不关连接，靠 GC 回收句柄；
+    长跑时用显式的关闭更稳。
+    """
+
+    conn = _connect()
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 def init_db() -> None:
-    with _connect() as conn:
+    with _session() as conn:
         conn.executescript(_SCHEMA)
 
 
@@ -80,7 +97,7 @@ def utc_now_iso() -> str:
 def save_report(payload: dict[str, Any]) -> str:
     report_id = payload.get("id") or new_id()
     metrics = payload.get("metrics") or {}
-    with _connect() as conn:
+    with _session() as conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO reports (
@@ -172,7 +189,7 @@ def list_reports(
 
     clause = f"WHERE {' AND '.join(where)}" if where else ""
 
-    with _connect() as conn:
+    with _session() as conn:
         total = conn.execute(
             f"SELECT COUNT(*) AS n FROM reports {clause}", params
         ).fetchone()["n"]
@@ -184,26 +201,26 @@ def list_reports(
 
 
 def get_report(report_id: str) -> dict[str, Any] | None:
-    with _connect() as conn:
+    with _session() as conn:
         row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
     return _detail(row) if row else None
 
 
 def delete_report(report_id: str) -> bool:
-    with _connect() as conn:
+    with _session() as conn:
         cursor = conn.execute("DELETE FROM reports WHERE id = ?", (report_id,))
     return cursor.rowcount > 0
 
 
 def count_reports() -> int:
-    with _connect() as conn:
+    with _session() as conn:
         return int(conn.execute("SELECT COUNT(*) AS n FROM reports").fetchone()["n"])
 
 
 def trend_points(limit: int = 12) -> list[dict[str, Any]]:
     """按时间正序返回最近若干轮的可比指标，供趋势图使用。"""
 
-    with _connect() as conn:
+    with _session() as conn:
         rows = conn.execute(
             """
             SELECT id, created_at, version, title, verdict, verdict_label,
@@ -252,7 +269,7 @@ def load_settings() -> dict[str, Any]:
     """界面保存的配置覆盖项。空表 = 全部沿用 .env 默认。"""
 
     try:
-        with _connect() as conn:
+        with _session() as conn:
             rows = conn.execute("SELECT key, value FROM settings").fetchall()
     except sqlite3.Error:
         return {}
@@ -273,7 +290,7 @@ def save_settings(values: dict[str, Any]) -> dict[str, Any]:
     因此「只改模型名」不会顺手把 Key 清掉。
     """
 
-    with _connect() as conn:
+    with _session() as conn:
         for key, value in values.items():
             if key not in SETTINGS_KEYS:
                 continue
@@ -290,5 +307,5 @@ def save_settings(values: dict[str, Any]) -> dict[str, Any]:
 def clear_settings() -> None:
     """全部恢复为 .env 默认。"""
 
-    with _connect() as conn:
+    with _session() as conn:
         conn.execute("DELETE FROM settings")

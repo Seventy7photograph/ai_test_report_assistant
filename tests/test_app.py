@@ -560,3 +560,95 @@ def test_html_export_neutralises_injected_scripts_and_urls():
     assert "vbscript:" not in out.lower()
     assert 'href="https://example.com"' in out
     assert "&lt;script&gt;" in out
+
+
+def test_unrecognised_status_never_opens_the_gate():
+    """读不出来的状态曾经既不算未关闭也不算已修复，被闸门当成已关闭放行。"""
+    for label in ("in review", "fixing", "待复核", "待验证", "pending verification", "N/A", "？"):
+        assert normalize_status(label) in ("open", "unknown"), label
+
+    for label in ("in review", "fixing", "待复核", "pending verification", "N/A"):
+        payload = {
+            "total_cases": 10,
+            "passed": 10,
+            "defects": [{"id": "B1", "priority": "P0", "status": label}],
+        }
+        result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+        assert result.metrics is not None
+        assert result.metrics.open_p0 == 1, label
+        assert result.metrics.verdict == "reject", label
+
+    # 明确标成已修复 / 已驳回的仍然放行
+    assert normalize_status("已回归") == "resolved"
+    assert normalize_status("回归通过") == "resolved"
+    assert normalize_status("验证通过") == "resolved"
+    assert normalize_status("Won't Fix") == "rejected"
+
+
+def test_same_id_in_different_modules_is_not_deduped():
+    """不同模块复用同一编号是常见做法，不能当成重复丢掉。"""
+    payload = {
+        "total_cases": 10,
+        "passed": 10,
+        "defects": [
+            {"id": "1", "module": "支付", "priority": "P0", "status": "open"},
+            {"id": "1", "module": "登录", "priority": "P1", "status": "open"},
+        ],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    assert result.metrics is not None
+    assert result.metrics.defects_total == 2
+    assert result.metrics.open_p0 == 1
+    assert result.metrics.open_p1 == 1
+
+
+def test_prompt_carries_authoritative_defect_details():
+    """缺陷明细要进"权威口径"，模型才不用自己数原始数据。"""
+    from assistant.prompts import build_user_prompt
+
+    payload = {
+        "version": "9.1",
+        "total_cases": 100,
+        "passed": 98,
+        "failed": 2,
+        "defects": [
+            {"id": "BUG-1", "priority": "P0", "module": "支付", "status": "in review"},
+            {"id": "BUG-2", "priority": "P2", "module": "登录", "status": "resolved"},
+        ],
+    }
+    result = compute_metrics(json.dumps(payload, ensure_ascii=False))
+    prompt = build_user_prompt(result, "{}", "重点分析")
+    start = prompt.index("【系统计算结果")
+    authoritative = prompt[start:prompt.index("【原始测试数据", start)]
+    assert "BUG-1" in authoritative
+    assert "支付" in authoritative
+    assert "未关闭" in authoritative
+    assert "已修复" in authoritative
+
+
+def test_oversized_input_is_truncated_before_the_model(monkeypatch):
+    """几 MB 的日志不能整段塞进 prompt，但指标仍按完整数据算。"""
+    seen: dict[str, object] = {}
+
+    async def fake_complete(prompt: str, settings):
+        seen["prompt"] = prompt
+        return "## 测试概况\nok", None
+
+    monkeypatch.setattr("assistant.routers.analyze.complete", fake_complete)
+    big = '{"total_cases": 5000, "passed": 4900, "failed": 100, "note": "' + ("x" * 40000) + '"}'
+    response = client.post("/api/analyze", json={"test_data": big, "save": False})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"]["total"] == 5000  # 指标基于完整数据
+    assert any("截断" in warning for warning in body["warnings"])
+    assert len(seen["prompt"]) < 25000
+
+
+def test_provider_label_reads_naturally_for_local_hosts():
+    from assistant.config import provider_label
+
+    assert provider_label("api.deepseek.com") == "DeepSeek"
+    assert provider_label("127.0.0.1") == "本地服务"
+    assert provider_label("localhost") == "本地服务"
+    assert provider_label("192.168.1.20") == "本地服务"
+    assert provider_label("") == "自定义"

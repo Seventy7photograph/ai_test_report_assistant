@@ -18,6 +18,10 @@ from ..schemas import AnalyzeRequest, AnalyzeResponse, MetricsRequest, MetricsRe
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
+# 送进模型的原文上限。指标永远基于完整数据计算，只有 prompt 里的原文会被截断 ——
+# 粘贴一份几 MB 的执行日志否则会直接打满上下文并白白烧额度。
+_MAX_PROMPT_DATA = 20000
+
 
 def _prepare(req: AnalyzeRequest) -> tuple[MetricsResult, str]:
     """先算指标，再把原始数据整理成便于模型阅读的形式。"""
@@ -28,6 +32,13 @@ def _prepare(req: AnalyzeRequest) -> tuple[MetricsResult, str]:
         normalized = json.dumps(json.loads(req.test_data), ensure_ascii=False, indent=2)
     except (json.JSONDecodeError, TypeError):
         pass
+
+    if len(normalized) > _MAX_PROMPT_DATA:
+        result.warnings.append(
+            f"原始数据 {len(normalized)} 字符，超过 {_MAX_PROMPT_DATA} 字符上限，"
+            "已截断后再交给模型；指标仍按完整数据计算。"
+        )
+        normalized = normalized[:_MAX_PROMPT_DATA] + "\n…（数据过长，已截断）"
     return result, normalized
 
 

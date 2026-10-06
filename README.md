@@ -152,6 +152,7 @@ POST /api/analyze
 ## 8. 目录结构
 
 ```
+OPTIMIZATION.md            待优化项清单（含已知口径与优先级）
 app.py                     应用入口：路由挂载、MIME 修正、SPA 托管
 assistant/
   config.py                环境变量解析、服务商探测、模型列表
@@ -164,7 +165,7 @@ assistant/
   samples.py               4 套示例数据集
   routers/                 system / analyze / reports / settings 四组接口
 frontend/                  Vue 3 + TS + Vite + Element Plus
-tests/test_app.py          34 项接口、指标与配置测试
+tests/test_app.py          39 项接口、指标与配置测试
 scripts/mock_llm.py        本地假模型服务（离线跑通全流程）
 scripts/seed_demo.py       演示数据播种（--reset 清空重建）
 scripts/dev.ps1            启动后端并清理残留 uvicorn 进程
@@ -215,3 +216,8 @@ pwsh scripts/dev.ps1        # 自动清理后再启动
 后续的模型错误通过 SSE 的 `event: error` 传给前端。所以「200 + 界面报 502」是正常现象，
 要看前端提示里的具体原因。本机模型服务（`127.0.0.1` / 内网）被系统代理劫持是常见成因，
 `assistant/llm.py` 已对环回与内网地址强制绕过系统代理。
+
+## 12. 优化清单
+
+已知待优化项（判定阈值可配置、执行率门限、通过率口径、归档分页、流式 token 用量等）
+记录在 [`OPTIMIZATION.md`](OPTIMIZATION.md)，按 P0 / P1 / P2 排列，每条附现象、影响、建议与工作量。
